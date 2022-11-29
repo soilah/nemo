@@ -260,6 +260,7 @@ def SimpleScan(pricli):
             pricli.UpdatePage(["==================== Disconnected hosts ======================="])
             for host in network_status.disconnected:
                 pricli.UpdatePage([host.ip,"\t",host.hostname],[pricli.BLUE,pricli.WHITE,pricli.RED])
+        pricli.RefreshPage()
         time.sleep(5)
         pricli.ClearPages()
 
@@ -286,6 +287,7 @@ def PortScan(scan_type,pricli):
         pricli.Refresh()
 
         pricli.UpdatePage(["====================== PORT SCAN ======================"])
+        pricli.RefreshPage()
         for host in network_status.hosts:
             if network_status.stopped:
                 stopped = True
@@ -316,7 +318,7 @@ def PortScan(scan_type,pricli):
                 ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
                 pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
                 pricli.UpdatePage(["Ports:"],[pricli.GREEN])
-                pricli.AddTab()
+                # pricli.AddTab()
                 for port in host.ports:
                     Port_Scan_Txt += str(port.num)
                     pricli.UpdatePage([str(port.num)],[pricli.YELLOW])
@@ -324,8 +326,9 @@ def PortScan(scan_type,pricli):
                     if scan_type == 2: ## print version if selected
                         pricli.UpdatePage(["\t","Version:","\t",port.version],[None,pricli.MAGENTA,None,pricli.RED])
 
-                    pricli.RemoveTab()
-                pricli.RemoveTab()
+                    # pricli.RemoveTab()
+                # pricli.RemoveTab()
+        pricli.RefreshPage()
 
         time.sleep(30)
         pricli.ClearPages()
@@ -513,7 +516,7 @@ def MainMenu(pricli):
             
         elif choice == 2:
             # is_in_another_menu = True
-            selection = pricli.menu.Menu('Select port scan type...',['Simple port scan','Service version scan'])
+            selection = pricli.menu.Menu('Select port scan type...',['Simple port scan','Service version scan','Exit'])
             if selection == 1:
                 scan_type = 1
             elif selection == 2:

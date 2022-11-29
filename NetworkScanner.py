@@ -188,6 +188,7 @@ class NetworkScanner:
         cmd.append(self.nmap_bin)
         if str(scan_type) == str(2):
             cmd.append("-sV")
+            cmd.append("-Pn")
         cmd.append(ip)
         
 
@@ -198,6 +199,7 @@ class NetworkScanner:
         cmd=[]
         cmd.append(self.nmap_bin)
         cmd.append('-O')
+        cmd.append('-Pn')
         cmd.append(ip)
 
         # return self.proman.RunProcessWait(cmd)

@@ -183,6 +183,7 @@ class ControlPanel:
         self.subtitle = subtitle
         self.subtitle_colors = subtitle_colors
         self.info_windows = []
+        self.progress_line = 0
 
         # self.window_title_colors = 
         # [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
@@ -247,6 +248,7 @@ class ControlPanel:
         
         self.pricli.UpdatePage(['\n'])
         self.pricli.UpdatePage([self.top_seperator1],[self.pricli.RED])
+        self.progress_line = self.pricli.GetCur()
         self.pricli.UpdatePage([self.top_seperator2],[self.pricli.GREEN])
         self.pricli.UpdatePage([self.top_seperator3],[self.pricli.RED])
         self.pricli.UpdatePage(['\n'])
@@ -259,6 +261,7 @@ class ControlPanel:
             self.DrawInfoWindows()
         
         self.pricli.RefreshPage()
+
 
     def DrawInfoWindows(self):
         max_width = 0
