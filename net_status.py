@@ -325,10 +325,10 @@ def PortScan(scan_type,pricli):
                     pricli.UpdatePage(["\t","Service:","\t",port.service],[None,pricli.CYAN,None,pricli.RED])
                     if scan_type == 2: ## print version if selected
                         pricli.UpdatePage(["\t","Version:","\t",port.version],[None,pricli.MAGENTA,None,pricli.RED])
+                    pricli.RefreshPage()
 
                     # pricli.RemoveTab()
                 # pricli.RemoveTab()
-        pricli.RefreshPage()
 
         time.sleep(30)
         pricli.ClearPages()
