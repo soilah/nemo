@@ -28,7 +28,6 @@ class ProMan:
         return res
 
     def RunProcessWait(self,command,shell=False):
-        # proc1 = subprocess.Popen(['echo','spacerouren!$'], stdout=subprocess.PIPE)
         # command.insert(0,'-S')
         # command.insert(0,'sudo')
         # proc = subprocess.Popen(command,stdin=proc1.stdout,stdout=subprocess.PIPE,shell=shell)
