@@ -647,7 +647,7 @@ def ParseArguments():
             scan_type = 2
         return 3,args.network,scan_type
     else:
-        return 0
+        return 0, None, None
 
 def StartNemo(mode,network_status):
 
