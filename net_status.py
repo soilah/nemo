@@ -1,28 +1,32 @@
-from concurrent.futures import thread
 from dis import disco
 from distutils.debug import DEBUG
-from http import client
 import os
 from pickle import FALSE
-import subprocess
 from threading import Thread, Lock
 import sched, time
-import logging
 import socket
-import select
 # from menu_launcher import *
-import curses
-import queue
 import sys
 from Pricli import Pricli, InfoWindow, ControlPanel
 from ProMan import ProMan
 from NetworkScanner import NetworkScanner
-
-from yaml import parse
+import ipaddress 
+import argparse
 
 from Host import *
 
 lock = Lock()
+
+
+class Nemo:
+    def __init__(self,mode=0):
+        self.NORMAL = 0
+        self.NOFANCY = 1
+        self.DAEMON = 2
+        self.INFORMER = 3
+
+        self.mode = mode
+
 
 class Theme:
     def __init__(self,pricli):
@@ -131,6 +135,7 @@ class NetworkStatus(object):
         self.host_files = None
         self.host_json_data = []
         self.InitJson()
+        self.stopped = False
     
     def Clear(self):
         for host in self.hosts:
@@ -149,11 +154,24 @@ class NetworkStatus(object):
         self.new_hosts = []
 
         self.numHosts = 0
+    
+    def SortHosts(self):
+        ip_list = sorted([h.ip for h in self.hosts],key=ipaddress.IPv4Address)
+
+        temp_hosts = []
+        for ip in ip_list:
+            for host in self.hosts:
+                if ip == host.ip:
+                    temp_hosts.append(host)
+        
+        self.hosts = temp_hosts
 
     def Update(self):
         self.numHosts = len(self.hosts)
         for host in self.hosts:
             host.LoadJsonData()
+        
+        self.SortHosts()
     
     def FirstTimeInit(self):
         networks_path = os.getcwd()+'/Networks'
@@ -230,16 +248,16 @@ def Exit(pricli):
 
 
 
-def simple_scan(pricli):
+def simple_scan(pricli,network_status,network_scanner):
     if network_status.stopped:
         pricli.Clear()
         return
 
-    x = proman.StartThread(SimpleScan,(pricli,))
+    x = proman.StartThread(SimpleScan,(pricli,network_status,network_scanner,))
     return x
 
-def SimpleScan(pricli):
-    global network_status
+def SimpleScan(pricli,network_status,network_scanner):
+    # global network_status
     if network_status.stopped:
         pricli.Clear()
         return
@@ -282,15 +300,15 @@ def SimpleScan(pricli):
         time.sleep(5)
         pricli.ClearPages()
 
-def port_scan(pricli,port_scan_type=1):
+def port_scan(pricli,network_status,network_scanner,port_scan_type=1):
     if network_status.stopped:
         pricli.Clear()
         return
 
-    x = proman.StartThread(PortScan,(port_scan_type,pricli,))
+    x = proman.StartThread(PortScan,(port_scan_type,pricli,network_status,network_scanner,))
     return x
 
-def PortScan(scan_type,pricli):
+def PortScan(scan_type,pricli,network_status,network_scanner,fancy=True):
     stopped = False
     while True:
         if stopped:
@@ -300,13 +318,13 @@ def PortScan(scan_type,pricli):
         network_scanner.NetworkDiscovery(network_status.network)
         network_status.Update()
 
-        pricli.Clear()
-        pricli.Init()
-        pricli.Refresh()
+        if fancy:
+            pricli.Clear()
+            pricli.Init()
+            pricli.Refresh()
 
-        pricli.UpdatePage(["====================== PORT SCAN ======================"])
-        pricli.RefreshPage()
         for host in network_status.hosts:
+            print('Host: '+host.ip)
             if network_status.stopped:
                 stopped = True
                 break
@@ -318,51 +336,56 @@ def PortScan(scan_type,pricli):
             else:
                 continue
 
-        
-            ## The first section until AssessText, checks if the text to be printed will fit the screen rows. 
-            ## If not, it will be (hopefully) printed on a new column, right to the already printed ones
-            ## and on the top row.
+            if fancy:
+                pricli.UpdatePage(["====================== PORT SCAN ======================"])
+                pricli.RefreshPage()
 
-            if len(host.ports) > 0:
-                Port_Scan_Txt = ""
-                Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
-                Port_Scan_Txt += "Ports:\n\t"
-                for port in host.ports:
-                    if scan_type == 2:
-                        Port_Scan_Txt += str(port.num)+'\n\t'+port.service+"\n\t"+port.version+"\n\t"
-                    else:
-                        Port_Scan_Txt += str(port.num)+'\n\t'+port.service+'\n\t'
-                if not pricli.AssessText(Port_Scan_Txt):
-                    pricli.CreateNewPage()
+            
+                ## The first section until AssessText, checks if the text to be printed will fit the screen rows. 
+                ## If not, it will be (hopefully) printed on a new column, right to the already printed ones
+                ## and on the top row.
 
-                ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
-                pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
-                pricli.UpdatePage(["Ports:"],[pricli.GREEN])
-                # pricli.AddTab()
-                for port in host.ports:
-                    Port_Scan_Txt += str(port.num)
-                    pricli.UpdatePage([str(port.num)],[pricli.YELLOW])
-                    pricli.UpdatePage(["\t","Service:","\t",port.service],[None,pricli.CYAN,None,pricli.RED])
-                    if scan_type == 2: ## print version if selected
-                        pricli.UpdatePage(["\t","Version:","\t",port.version],[None,pricli.MAGENTA,None,pricli.RED])
-                    pricli.RefreshPage()
+                if len(host.ports) > 0:
+                    Port_Scan_Txt = ""
+                    Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
+                    Port_Scan_Txt += "Ports:\n\t"
+                    for port in host.ports:
+                        if scan_type == 2:
+                            Port_Scan_Txt += str(port.num)+'\n\t'+port.service+"\n\t"+port.version+"\n\t"
+                        else:
+                            Port_Scan_Txt += str(port.num)+'\n\t'+port.service+'\n\t'
+                    if not pricli.AssessText(Port_Scan_Txt):
+                        pricli.CreateNewPage()
 
+                    ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
+                    pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
+                    pricli.UpdatePage(["Ports:"],[pricli.GREEN])
+                    # pricli.AddTab()
+                    for port in host.ports:
+                        Port_Scan_Txt += str(port.num)
+                        pricli.UpdatePage([str(port.num)],[pricli.YELLOW])
+                        pricli.UpdatePage(["\t","Service:","\t",port.service],[None,pricli.CYAN,None,pricli.RED])
+                        if scan_type == 2: ## print version if selected
+                            pricli.UpdatePage(["\t","Version:","\t",port.version],[None,pricli.MAGENTA,None,pricli.RED])
+                        pricli.RefreshPage()
+
+                        # pricli.RemoveTab()
                     # pricli.RemoveTab()
-                # pricli.RemoveTab()
-            else: 
-                Port_Scan_Txt = ""
-                Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
-                Port_Scan_Txt += "No open ports found"
-                if not pricli.AssessText(Port_Scan_Txt):
-                    pricli.CreateNewPage()
+                else: 
+                    Port_Scan_Txt = ""
+                    Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
+                    Port_Scan_Txt += "No open ports found"
+                    if not pricli.AssessText(Port_Scan_Txt):
+                        pricli.CreateNewPage()
 
-                ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
-                pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
-                pricli.UpdatePage(['\tHas no open ports'],[pricli.GREEN])
+                    ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
+                    pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
+                    pricli.UpdatePage(['\tHas no open ports'],[pricli.GREEN])
 
 
         time.sleep(30)
-        pricli.ClearPages()
+        if fancy:
+            pricli.ClearPages()
 
 # def analyzer(pricli):
 #     if network_status.stopped:
@@ -372,7 +395,7 @@ def PortScan(scan_type,pricli):
 #     x = proman.StartThread(Analyzer,(pricli,))
 #     return x
 
-def PortScanResults(host_ip,scan_type):
+def PortScanResults(host_ip,scan_type,network_scanner,pricli):
     ports = network_scanner.ServiceScan(host_ip,scan_type=scan_type)
 
     lines = []
@@ -396,7 +419,7 @@ def PortScanResults(host_ip,scan_type):
     return lines,colors
         
 
-def OsDetectionResults(host_ip):
+def OsDetectionResults(host_ip,network_scanner,pricli):
     os = network_scanner.OsScan(host_ip)
     # pricli.UpdatePage(['OS Info for: ', host_ip ,' (',hostname,')'],[pricli.BLUE,pricli.GREEN,pricli.WHITE,pricli.YELLOW,pricli.WHITE])
     # pricli.UpdatePage(['Mac Address: ',os[0]],[pricli.BLUE,pricli.RED])
@@ -425,7 +448,7 @@ def OsDetectionResults(host_ip):
         colors.append([pricli.normal_color,pricli.YELLOW])
     return lines,colors
 
-def analyzer(pricli):
+def analyzer(pricli,network_status,network_scanner):
     stopped = False
     while True:
         if stopped:
@@ -484,7 +507,7 @@ def analyzer(pricli):
                     title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
-                    lines,colors = OsDetectionResults(host_ip)
+                    lines,colors = OsDetectionResults(host_ip,network_scanner=network_scanner,pricli=pricli)
                     info_window = InfoWindow(pricli,["OS INFO"],lines,colors)
                     control_panel.InsertWindow(info_window)
                     control_panel.Draw()
@@ -494,8 +517,8 @@ def analyzer(pricli):
                     title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
-                    os_lines, os_colors = OsDetectionResults(host_ip)
-                    port_lines, port_colors = PortScanResults(host_ip,scan_type=2)
+                    os_lines, os_colors = OsDetectionResults(host_ip,network_scanner=network_scanner,pricli=pricli)
+                    port_lines, port_colors = PortScanResults(host_ip,scan_type=2,network_scanner=network_scanner,pricli=pricli)
 
                     os_info_window = InfoWindow(pricli,['OS INFO'],os_lines,os_colors)
                     port_info_window = InfoWindow(pricli,['Port/Services Info'],port_lines,port_colors)
@@ -527,8 +550,8 @@ def readFromMonitor(client):
     # read_thread = Thread(target=lambda:readFromMonitor(client_socket))
     # read_thread.start()
 
-def MainMenu(pricli):
-    global network_status
+def MainMenu(pricli,network_status,network_scanner):
+    # global network_status
     global process_list
     global thread_list
     # is_in_another_menu = False ### becomes true if user selects one of the options and false if user is in current menu
@@ -542,7 +565,7 @@ def MainMenu(pricli):
 
         if choice == 1:
             pricli.ChangeWindow(reset=True)
-            scan_thread = simple_scan(pricli)
+            scan_thread = simple_scan(pricli,network_status=network_status,network_scanner=network_scanner)
             # is_in_another_menu = True
             
         elif choice == 2:
@@ -557,9 +580,9 @@ def MainMenu(pricli):
 
             ## User has pressed q
             pricli.ChangeWindow(reset=True)
-            portscan_thread = port_scan(pricli,scan_type)
+            portscan_thread = port_scan(pricli,network_status=network_status,network_scanner=network_scanner,port_scan_type=scan_type)
         elif choice == 3:
-            analyzer_thread = analyzer(pricli)
+            analyzer_thread = analyzer(pricli,network_status=network_status,network_scanner=network_scanner)
             # pricli.lock.acquire()
             # is_in_another_menu = True
             continue
@@ -598,18 +621,65 @@ def getNetInfo(pricli):
     choice = pricli.menu.Menu("Choose a network to scan...",res)
     return res[choice-1]
 
+def ParseArguments():
+    parser = argparse.ArgumentParser(prog='net_status',description='A network monitor/analyzer')
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument('--nofancy',action='store_true',help='Show classic terminal output (without curses)')
+    mode_group.add_argument('--daemon',action='store_true',help='Run in background')
+    mode_group.add_argument('--informer',action='store_true',help='Monitor for opened/closed ports and report to admin')
+    parser.add_argument('--network',action='store',help='The network to scan. Required with --informer option')
+    parser.add_argument('--port-scan-type',choices=['simple','version'],help='simple for simple port discovery, version for version scan (-sV). Required with --informer option')
+    args = parser.parse_args()
 
-if __name__ == "__main__":
-    pricli = Pricli()
-    # theme = Theme(pricli)
-    # theme.CreateWalls()
-    proman = ProMan()
-
-    network = getNetInfo(pricli)
-    if 'Exit' in network:
-        Exit(pricli)
+    if args.nofancy:
+        return 1
+    elif args.daemon:
+        return 2
+    elif args.informer:
+        if args.network is None:
+            parser.error('--network option is required with the --informer switch')
+        if args.port_scan_type is None:
+            parser.error('--port_scan_type option is required with the --informer switch')
+        scan_type = 0
+        if args.port_scan_type == 'simple':
+            scan_type = 1
+        else:
+            scan_type = 2
+        return 3,args.network,scan_type
     else:
+        return 0
+
+def StartNemo(mode,network_status):
+
+    pricli = None
+    network = ''
+    if mode[0] == nemo.INFORMER:
+        network = mode[1]
         network_status = NetworkStatus(network,None)
         network_scanner = NetworkScanner(network_status)
-        # Analyzer(pricli)
-        MainMenu(pricli)
+        PortScan(mode[2],pricli,network_status,network_scanner,fancy=False)
+    else:
+        pricli = Pricli()
+        network = getNetInfo(pricli)
+        network_status = NetworkStatus(network,None)
+        network_scanner = NetworkScanner(network_status)
+        MainMenu(pricli,network_status=network_status,network_scanner=network_scanner)
+        if 'Exit' in network:
+            Exit(pricli)
+    # theme = Theme(pricli)
+    # theme.CreateWalls()
+
+
+    
+    # Analyzer(pricli)
+
+
+if __name__ == "__main__":
+    mode = ParseArguments()
+    nemo = Nemo(mode)
+    proman = ProMan()
+    network_status = None
+
+    StartNemo(mode,network_status)
+    # sys.exit()
+

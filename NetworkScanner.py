@@ -82,14 +82,13 @@ class NmapParser:
 
         new_hosts = []
         host_id = 0
-        mac = 'Unknown'
+        mac = 'LOCALHOST'
         ip = ""
         hostname = ""
         for line in lines:
+            host_found = False
             if 'MAC' in line:
                 mac = FindSubstr(line,'MAC Address:',' (').strip()
-                found_host = Host([ip,hostname],mac=mac)
-                new_hosts.append(found_host)
             if 'Nmap scan report' in line:
                 # line = lines[i]
                 ### If the 'Nmap' line contains '(': it has info about the hostname
@@ -102,6 +101,11 @@ class NmapParser:
                     ip_index = line.find("for") + 4
                     ip = line[ip_index:len(line)]
                     hostname = "Unnamed Host"
+                host_found = True
+            if host_found:
+                found_host = Host([ip,hostname],mac=mac)
+                new_hosts.append(found_host)
+                host_found = False
                 ### Create a Host object with found Ip,Hostname
         # host_id += 1
 

@@ -52,7 +52,7 @@ class Host(object):
             ports = []
             for port in json_data['ports']:
                 ports.append(Port(port['port'],None,port['service'],port['version']))
-                print(port['service'])
+                # print(port['service'])
             self.json_ip = ip
             self.json_hostname = hostname
             self.json_mac = mac
@@ -71,8 +71,8 @@ class Host(object):
         closed_ports = []
         old_port_nums = [p.num for p in self.json_ports]
         new_port_nums = [p.num for p in self.ports]
-        print(old_port_nums)
-        print(new_port_nums)
+        # print(old_port_nums)
+        # print(new_port_nums)
         #### CHECK FOR NEW OPENED PORTS
         for new_port in self.ports:
             if new_port.num not in old_port_nums: # found new port
@@ -85,13 +85,13 @@ class Host(object):
         
 
         for op in opened_ports:
-            print('open')
             message = "New port opened: " + op.num +' on host '+self.ip +'('+self.hostname+')\nService: '+op.service +'\nVersion: '+op.version
+            print(message)
             SendMessage(message)
 
         for cp in closed_ports:
-            print('close')
             message = "Port closed: " + cp.num +' on host '+self.ip +'('+self.hostname+')\nService: '+cp.service +'\nVersion: '+cp.version
+            print(message)
             SendMessage(message)
 
 
