@@ -61,7 +61,6 @@ class NmapParser:
         self.network_status.new_hosts = []
 
         # self.network_status.hosts = []
-        step = 0
         # if "MAC" in lines[4]:
         ### Nmap prints a number of lines dedicated to each host.
         ### If run as root, nmap will also print the mac address of each host
@@ -82,25 +81,29 @@ class NmapParser:
         ### Generaly, If the line starts with 'Nmap', it contains info about the IP and the hostname (if any)
 
         new_hosts = []
-        for i in range(1,len(lines)-1,1):
-            if 'Nmap' not in lines[i]:
-                continue
-            line = lines[i]
-            ip = ""
-            hostname = ""
-            ### If the 'Nmap' line contains '(': it has info about the hostname
-            if '(' in line: ### Parse Hostname and Ip 
-                ip_index = line.find('(')+1
-                host_index = line.find("for") + 4
-                ip = line[ip_index:len(line)-1]
-                hostname = line[host_index:ip_index-2]
-            else: ### Parse IP
-                ip_index = line.find("for") + 4
-                ip = line[ip_index:len(line)]
-                hostname = "Unnamed Host"
-            ### Create a Host object with found Ip,Hostname
-            found_host = Host([ip,hostname])
-            new_hosts.append(found_host)
+        host_id = 0
+        mac = 'Unknown'
+        ip = ""
+        hostname = ""
+        for line in lines:
+            if 'MAC' in line:
+                mac = FindSubstr(line,'MAC Address:',' (').strip()
+                found_host = Host([ip,hostname],mac=mac)
+                new_hosts.append(found_host)
+            if 'Nmap scan report' in line:
+                # line = lines[i]
+                ### If the 'Nmap' line contains '(': it has info about the hostname
+                if '(' in line: ### Parse Hostname and Ip 
+                    ip_index = line.find('(')+1
+                    host_index = line.find("for") + 4
+                    ip = line[ip_index:len(line)-1]
+                    hostname = line[host_index:ip_index-2]
+                else: ### Parse IP
+                    ip_index = line.find("for") + 4
+                    ip = line[ip_index:len(line)]
+                    hostname = "Unnamed Host"
+                ### Create a Host object with found Ip,Hostname
+        # host_id += 1
 
         ### Categorize the Hosts found as new,current or disconnected
         new_hosts, same_hosts, disconnected = RefreshHosts(new_hosts,self.network_status.hosts)

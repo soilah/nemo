@@ -128,6 +128,9 @@ class NetworkStatus(object):
         self.s = sched.scheduler(time.time, time.sleep)
         #self.port = port #port to connect to monitor
         #self.monitor_fd = self.ConnectToMonitor()
+        self.host_files = None
+        self.host_json_data = []
+        self.InitJson()
     
     def Clear(self):
         for host in self.hosts:
@@ -147,12 +150,27 @@ class NetworkStatus(object):
 
         self.numHosts = 0
 
-
-
-
-
     def Update(self):
         self.numHosts = len(self.hosts)
+        for host in self.hosts:
+            host.LoadJsonData()
+    
+    def FirstTimeInit(self):
+        networks_path = os.getcwd()+'/Networks'
+        os.mkdir(networks_path)
+
+
+    #### Every network scanned, has its own folder placed inside the 'Networks' folder ####
+    def InitJson(self):
+        networks_path = os.getcwd()+'/Networks'
+        #### check if path exists. If not initialize the directories (create folder etc)
+        if os.path.exists(networks_path):
+            self.host_files = next(os.walk(networks_path), (None, None, []))[2]  # [] if no file
+            for host in self.hosts:
+                host.LoadJsonData()
+        else:
+            self.FirstTimeInit()
+
 
     def ConnectToMonitor(self):
         host = '127.0.0.1'
@@ -295,6 +313,8 @@ def PortScan(scan_type,pricli):
 
             if network_scanner.IsHostUp(host.ip):
                 host.ports = network_scanner.ServiceScan(host.ip,scan_type)
+                host.CheckChanges()
+                host.SaveJson()
             else:
                 continue
 
@@ -305,7 +325,7 @@ def PortScan(scan_type,pricli):
 
             if len(host.ports) > 0:
                 Port_Scan_Txt = ""
-                Port_Scan_Txt += "Host: "+host.ip+" ( "+host.hostname+")\n"
+                Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
                 Port_Scan_Txt += "Ports:\n\t"
                 for port in host.ports:
                     if scan_type == 2:
@@ -329,6 +349,17 @@ def PortScan(scan_type,pricli):
 
                     # pricli.RemoveTab()
                 # pricli.RemoveTab()
+            else: 
+                Port_Scan_Txt = ""
+                Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
+                Port_Scan_Txt += "No open ports found"
+                if not pricli.AssessText(Port_Scan_Txt):
+                    pricli.CreateNewPage()
+
+                ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
+                pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
+                pricli.UpdatePage(['\tHas no open ports'],[pricli.GREEN])
+
 
         time.sleep(30)
         pricli.ClearPages()
