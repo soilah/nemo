@@ -648,6 +648,7 @@ def MainMenu(nemo):
         elif choice == len(actions):
             Exit(pricli)
             break
+        ### skata
 
         key = ''
         while key != ord('q'):
