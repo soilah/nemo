@@ -102,7 +102,7 @@ class InfoWindow:
                 txt += l
             length = len(txt)
             if '\t' in txt:
-                length += 4
+                length += 8
             if length > max_width:
                 max_width = len(txt)
 
@@ -574,6 +574,8 @@ class Pricli:
         # self.UpdateLongestPos(len(text))
         self.screen.addstr(self.GetCur(),self.GetPos(),text,curses.color_pair(color))
         self.UpdatePos(len(text))
+        if '\t' in text:
+            self.UpdatePos(8)
         self.UpdateText(str(text))
         self.screen.refresh()
 
