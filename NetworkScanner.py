@@ -171,6 +171,10 @@ class NetworkScanner:
         self.proman = ProMan()
         self.network_status = network_status
         self.parser = NmapParser(self.network_status)
+        self.nmap_options = None
+    
+    def SetOptions(self,options):
+        self.nmap_options = options
     
     def IsHostUp(self,ip):
         cmd = []
@@ -196,6 +200,8 @@ class NetworkScanner:
         if str(scan_type) == str(2):
             cmd.append("-sV")
             cmd.append("-Pn")
+        for opt in self.nmap_options:
+            cmd.append(opt)
         cmd.append(ip)
         
 
