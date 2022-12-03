@@ -19,13 +19,61 @@ lock = Lock()
 
 
 class Nemo:
-    def __init__(self,mode=0):
+    def __init__(self,mode):
         self.NORMAL = 0
         self.NOFANCY = 1
         self.DAEMON = 2
         self.INFORMER = 3
 
+        self.SCAN_STRESS_NORMAL = 1
+        self.SCAN_STRESS_FAST = 2
+        self.SCAN_STRESS_FULL = 3
+
+        self.nmap_options = []
+
+        #### Fancy terminal with colors (ncurses) ####
+        self.fancy = True
+
+        #### These Arguments are used by the **** INFORMER **** switch ####
+        #### Scan type to use when port scanning (required by informer switch) ####
+        self.scan_type = 1
+        self.port_scan_period = 30
+        self.port_stress = 1
+        self.ports_to_scan = None
+
         self.mode = mode
+        self.network_status = None
+        self.pricli = None
+        self.network_scanner = None
+
+        if self.mode[0] == self.INFORMER:
+            self.fancy = False
+
+        self.scan_type = self.mode[2]
+        self.port_scan_period = self.mode[3]
+        self.port_stress = self.mode[4]
+        self.ports_to_scan = self.mode[5]
+
+        if self.port_stress == self.SCAN_STRESS_FAST:
+            self.nmap_options.append('-F') 
+        elif self.port_stress == self.SCAN_STRESS_FULL:
+            self.nmap_options.append('-p1-65535')
+
+        if self.ports_to_scan is not None:
+            self.nmap_options.append(self.ports_to_scan)
+            
+
+    def SetNetworkStatus(self,network_status):
+        self.network_status = network_status
+    
+    def SetNetworkScanner(self,network_scanner):
+        self.network_scanner = network_scanner
+    
+    def SetPricli(self,pricli):
+        self.pricli = pricli
+    
+    def SetScanType(self,scan_type):
+        self.scan_type = scan_type
 
 
 class Theme:
@@ -248,15 +296,14 @@ def Exit(pricli):
 
 
 
-def simple_scan(pricli,network_status,network_scanner):
-    if network_status.stopped:
-        pricli.Clear()
-        return
-
-    x = proman.StartThread(SimpleScan,(pricli,network_status,network_scanner,))
+def simple_scan(nemo):
+    x = proman.StartThread(SimpleScan,(nemo,))
     return x
 
-def SimpleScan(pricli,network_status,network_scanner):
+def SimpleScan(nemo):
+    network_status = nemo.network_status
+    pricli = nemo.pricli
+    network_scanner = nemo.network_scanner
     # global network_status
     if network_status.stopped:
         pricli.Clear()
@@ -300,15 +347,17 @@ def SimpleScan(pricli,network_status,network_scanner):
         time.sleep(5)
         pricli.ClearPages()
 
-def port_scan(pricli,network_status,network_scanner,port_scan_type=1):
-    if network_status.stopped:
-        pricli.Clear()
-        return
-
-    x = proman.StartThread(PortScan,(port_scan_type,pricli,network_status,network_scanner,))
+def port_scan(nemo):
+    x = proman.StartThread(PortScan,(nemo,))
     return x
 
-def PortScan(scan_type,pricli,network_status,network_scanner,fancy=True):
+def PortScan(nemo):
+    pricli = nemo.pricli
+    network_status = nemo.network_status
+    network_scanner = nemo.network_scanner
+    fancy = nemo.fancy
+    scan_type = nemo.scan_type
+    port_scan_period = nemo.port_scan_period
     stopped = False
     while True:
         if stopped:
@@ -323,8 +372,12 @@ def PortScan(scan_type,pricli,network_status,network_scanner,fancy=True):
             pricli.Init()
             pricli.Refresh()
 
+            pricli.UpdatePage(["====================== PORT SCAN ======================"])
+            pricli.RefreshPage()
+
         for host in network_status.hosts:
-            print('Host: '+host.ip)
+            if not fancy:
+                print('Host: '+host.ip)
             if network_status.stopped:
                 stopped = True
                 break
@@ -337,10 +390,6 @@ def PortScan(scan_type,pricli,network_status,network_scanner,fancy=True):
                 continue
 
             if fancy:
-                pricli.UpdatePage(["====================== PORT SCAN ======================"])
-                pricli.RefreshPage()
-
-            
                 ## The first section until AssessText, checks if the text to be printed will fit the screen rows. 
                 ## If not, it will be (hopefully) printed on a new column, right to the already printed ones
                 ## and on the top row.
@@ -358,16 +407,15 @@ def PortScan(scan_type,pricli,network_status,network_scanner,fancy=True):
                         pricli.CreateNewPage()
 
                     ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
-                    pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
+                    pricli.UpdatePage(["Host: ",host.ip," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,pricli.RED,None])
                     pricli.UpdatePage(["Ports:"],[pricli.GREEN])
                     # pricli.AddTab()
                     for port in host.ports:
                         Port_Scan_Txt += str(port.num)
                         pricli.UpdatePage([str(port.num)],[pricli.YELLOW])
-                        pricli.UpdatePage(["\t","Service:","\t",port.service],[None,pricli.CYAN,None,pricli.RED])
+                        pricli.UpdatePage(["\t"+"Service:",port.service],[pricli.RED,pricli.CYAN])
                         if scan_type == 2: ## print version if selected
-                            pricli.UpdatePage(["\t","Version:","\t",port.version],[None,pricli.MAGENTA,None,pricli.RED])
-                        pricli.RefreshPage()
+                            pricli.UpdatePage(["\t"+"Version:",port.version],[pricli.RED,pricli.MAGENTA])
 
                         # pricli.RemoveTab()
                     # pricli.RemoveTab()
@@ -382,8 +430,10 @@ def PortScan(scan_type,pricli,network_status,network_scanner,fancy=True):
                     pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
                     pricli.UpdatePage(['\tHas no open ports'],[pricli.GREEN])
 
+            if fancy:
+                pricli.RefreshPage()
 
-        time.sleep(30)
+        time.sleep(port_scan_period)
         if fancy:
             pricli.ClearPages()
 
@@ -410,11 +460,11 @@ def PortScanResults(host_ip,scan_type,network_scanner,pricli):
         lines.append([port.num])
         colors.append([pricli.YELLOW])
         if scan_type == 1:
-            lines.append(['\t','Service: ',port.service])
-            colors.append([pricli.normal_color,pricli.CYAN,pricli.RED])
+            lines.append(['Service: ',port.service])
+            colors.append([pricli.CYAN,pricli.RED])
         else:
-            lines.append(['\t','Service: ',port.service, '  ', port.version])
-            colors.append([pricli.normal_color,pricli.CYAN,pricli.RED,pricli.normal_color,pricli.MAGENTA])
+            lines.append(['Service: ',port.service, '  ', port.version])
+            colors.append([pricli.CYAN,pricli.RED,pricli.normal_color,pricli.MAGENTA])
     
     return lines,colors
         
@@ -448,7 +498,10 @@ def OsDetectionResults(host_ip,network_scanner,pricli):
         colors.append([pricli.normal_color,pricli.YELLOW])
     return lines,colors
 
-def analyzer(pricli,network_status,network_scanner):
+def analyzer(nemo):
+    pricli = nemo.pricli
+    network_status = nemo.network_status
+    network_scanner = nemo.network_scanner
     stopped = False
     while True:
         if stopped:
@@ -550,8 +603,10 @@ def readFromMonitor(client):
     # read_thread = Thread(target=lambda:readFromMonitor(client_socket))
     # read_thread.start()
 
-def MainMenu(pricli,network_status,network_scanner):
+def MainMenu(nemo):
     # global network_status
+    pricli = nemo.pricli
+    network_status = nemo.network_status
     global process_list
     global thread_list
     # is_in_another_menu = False ### becomes true if user selects one of the options and false if user is in current menu
@@ -565,7 +620,7 @@ def MainMenu(pricli,network_status,network_scanner):
 
         if choice == 1:
             pricli.ChangeWindow(reset=True)
-            scan_thread = simple_scan(pricli,network_status=network_status,network_scanner=network_scanner)
+            scan_thread = simple_scan(nemo)
             # is_in_another_menu = True
             
         elif choice == 2:
@@ -578,11 +633,12 @@ def MainMenu(pricli,network_status,network_scanner):
             elif selection == 3:
                 continue
 
+            nemo.SetScanType(scan_type)
             ## User has pressed q
             pricli.ChangeWindow(reset=True)
-            portscan_thread = port_scan(pricli,network_status=network_status,network_scanner=network_scanner,port_scan_type=scan_type)
+            portscan_thread = port_scan(nemo)
         elif choice == 3:
-            analyzer_thread = analyzer(pricli,network_status=network_status,network_scanner=network_scanner)
+            analyzer_thread = analyzer(nemo)
             # pricli.lock.acquire()
             # is_in_another_menu = True
             continue
@@ -628,46 +684,75 @@ def ParseArguments():
     mode_group.add_argument('--daemon',action='store_true',help='Run in background')
     mode_group.add_argument('--informer',action='store_true',help='Monitor for opened/closed ports and report to admin')
     parser.add_argument('--network',action='store',help='The network to scan. Required with --informer option')
-    parser.add_argument('--port-scan-type',choices=['simple','version'],help='simple for simple port discovery, version for version scan (-sV). Required with --informer option')
+    parser.add_argument('--port-scan-type',choices=['simple','version'],help='simple for simple port discovery, version for version scan (-sV). Default is simple.')
+    parser.add_argument('--port-scan-period',action='store',type=int,help='Time in seconds after which the port scan will be repeated. Default is 30 seconds')
+    parser.add_argument('--port-stress',choices=['normal','fast','full'],help='Number of ports to be scanned. Default is normal (1000) ports. Fast scans less than 1000 and full scans all 65535 ports (slow).')
+    parser.add_argument('--ports',metavar='[1-65535]',type=int,nargs='+',help='Specific ports to scan. Ex: --ports 22 80 5001, --ports 1-65535')
     args = parser.parse_args()
 
+    mode = 0
     if args.nofancy:
         return 1
     elif args.daemon:
         return 2
     elif args.informer:
+        mode = 3
         if args.network is None:
             parser.error('--network option is required with the --informer switch')
         if args.port_scan_type is None:
-            parser.error('--port_scan_type option is required with the --informer switch')
-        scan_type = 0
-        if args.port_scan_type == 'simple':
+            # parser.error('--port_scan_type option is required with the --informer switch')
             scan_type = 1
-        else:
-            scan_type = 2
-        return 3,args.network,scan_type
     else:
-        return 0, None, None
+        mode = 0
 
-def StartNemo(mode,network_status):
+    #### GENERAL options
+    port_scan_period = 30
+    port_stress = 1
+
+    if args.port_scan_period is not None:
+        port_scan_period = int(args.port_scan_period)
+    scan_type = 0
+    if args.port_scan_type == 'simple':
+        scan_type = 1
+    else:
+        scan_type = 2
+    if args.port_stress is not None:
+        if args.ports is not None:
+            parser.error('--ports option cannot be used alongside with --port-stress option.')
+        if args.port_stress == 'fast':
+            port_stress = 2
+        elif args.port_stress == 'full':
+            port_stress = 3
+
+    return mode,args.network,scan_type,port_scan_period,port_stress,args.ports
+
+def StartNemo(nemo):
+    mode = nemo.mode
 
     pricli = None
     network = ''
     if mode[0] == nemo.INFORMER:
         network = mode[1]
-        network_status = NetworkStatus(network,None)
-        network_scanner = NetworkScanner(network_status)
-        PortScan(mode[2],pricli,network_status,network_scanner,fancy=False)
     else:
         pricli = Pricli()
+        nemo.SetPricli(pricli)
         network = getNetInfo(pricli)
-        network_status = NetworkStatus(network,None)
-        network_scanner = NetworkScanner(network_status)
-        MainMenu(pricli,network_status=network_status,network_scanner=network_scanner)
         if 'Exit' in network:
             Exit(pricli)
+            return
+
+    network_status = NetworkStatus(network,None)
+    network_scanner = NetworkScanner(network_status)
+    network_scanner.SetOptions(nemo.nmap_options)
+    nemo.SetNetworkStatus(network_status)
+    nemo.SetNetworkScanner(network_scanner)
     # theme = Theme(pricli)
     # theme.CreateWalls()
+
+    if mode[0] == nemo.INFORMER:
+        PortScan(nemo)
+    else:
+        MainMenu(nemo)
 
 
     
@@ -678,8 +763,8 @@ if __name__ == "__main__":
     mode = ParseArguments()
     nemo = Nemo(mode)
     proman = ProMan()
-    network_status = None
+    # network_status = None
 
-    StartNemo(mode,network_status)
+    StartNemo(nemo)
     # sys.exit()
 
