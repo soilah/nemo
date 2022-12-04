@@ -791,6 +791,7 @@ def StartNemo(nemo):
     network = ''
     if mode[0] == nemo.INFORMER:
         network = mode[1]
+        nemo.SetSetting('network',network)
     else:
         pricli = Pricli()
         nemo.SetPricli(pricli)
