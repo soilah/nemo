@@ -7,7 +7,7 @@ import sched, time
 import socket
 # from menu_launcher import *
 import sys
-from Pricli import Pricli, InfoWindow, ControlPanel
+from Pricli import Pricli, InfoWindow, ControlPanel, Settings, Option
 from ProMan import ProMan
 from NetworkScanner import NetworkScanner
 import ipaddress 
@@ -20,6 +20,7 @@ lock = Lock()
 
 class Nemo:
     def __init__(self,mode):
+        self.settings = None
         self.NORMAL = 0
         self.NOFANCY = 1
         self.DAEMON = 2
@@ -28,6 +29,19 @@ class Nemo:
         self.SCAN_STRESS_NORMAL = 1
         self.SCAN_STRESS_FAST = 2
         self.SCAN_STRESS_FULL = 3
+
+
+        #### General options
+        self.settings_bindings = dict()
+        self.setting = None
+
+        self.network = None
+        self.netmask = None
+        self.dns_server = None
+        self.AddSetting('network',self.network)
+        self.AddSetting('netmask',self.netmask)
+        self.AddSetting('dns_server',self.dns_server)
+        
 
         self.nmap_options = []
 
@@ -40,6 +54,12 @@ class Nemo:
         self.port_scan_period = 30
         self.port_stress = 1
         self.ports_to_scan = None
+
+        #### add these settings to the binder
+        self.AddSetting('scan_type',self.scan_type)
+        self.AddSetting('port_scan_period',self.port_scan_period)
+        self.AddSetting('port_stress',self.port_stress)
+        self.AddSetting('ports_to_scan',self.ports_to_scan)
 
         self.mode = mode
         self.network_status = None
@@ -61,7 +81,18 @@ class Nemo:
 
         if self.ports_to_scan is not None:
             self.nmap_options.append(self.ports_to_scan)
-            
+    
+    def AddSetting(self,key,value):
+        self.settings_bindings[key] = value
+    
+    def GetSetting(self,key):
+        return self.settings_bindings[key]
+    
+    def SetSetting(self,key,value):
+        setattr(self,key,value)
+    
+    def ChangeMember(self,member,value):
+        member = value
 
     def SetNetworkStatus(self,network_status):
         self.network_status = network_status
@@ -75,6 +106,8 @@ class Nemo:
     def SetScanType(self,scan_type):
         self.scan_type = scan_type
 
+    def AddSettings(self,settings):
+        self.settings = settings
 
 class Theme:
     def __init__(self,pricli):
@@ -142,14 +175,6 @@ class InputHandler:
     
     def Listen(self):
         self.input = self.pricli.Input()
-
-class Settings:
-    def __init__(self):
-        self.options = ['Network','Theme','Exit']
-    
-    def Show(self):
-        title = ['SETTINGS']
-
 
 
 
@@ -302,6 +327,7 @@ def simple_scan(nemo):
 
 def SimpleScan(nemo):
     network_status = nemo.network_status
+    # network_status.network = nemo.network
     pricli = nemo.pricli
     network_scanner = nemo.network_scanner
     # global network_status
@@ -309,7 +335,7 @@ def SimpleScan(nemo):
         pricli.Clear()
         return
     while(1):
-        network_scanner.NetworkDiscovery(network_status.network)
+        network_scanner.NetworkDiscovery(nemo.network)
         network_status.Update()
         if network_status.stopped:
             pricli.Clear()
@@ -364,7 +390,7 @@ def PortScan(nemo):
             break
         # UpdateHosts(network_status,pricli,locking=False)
         # network_status.Update()
-        network_scanner.NetworkDiscovery(network_status.network)
+        network_scanner.NetworkDiscovery(nemo.network)
         network_status.Update()
 
         if fancy:
@@ -614,7 +640,7 @@ def MainMenu(nemo):
         # if is_in_another_menu:
         #     time.sleep(2)
         #     continue
-        actions = ["Simple scan","Port Scan","Analyzer","Exit"] 
+        actions = ["Simple scan","Port Scan","Analyzer","Options","Exit"] 
         choice = pricli.menu.Menu("Select an action...",actions)
         network_status.stopped = False
 
@@ -643,6 +669,17 @@ def MainMenu(nemo):
             # is_in_another_menu = True
             continue
             # time.sleep(1)
+        elif choice == 4:
+            settings_choice = 0
+            while True:
+                settings_choice = nemo.settings.Draw()
+                if settings_choice == -1: #### Exit chosen
+                    break
+                settings = nemo.settings.DrawOption(settings_choice-1)
+                for key,value in settings.items():
+                    nemo.SetSetting(key,value)
+                continue
+            continue
             
 
         elif choice == len(actions):
@@ -727,6 +764,26 @@ def ParseArguments():
 
     return mode,args.network,scan_type,port_scan_period,port_stress,args.ports
 
+def CreateSettings(nemo,pricli):
+    settings = Settings(pricli,nemo)
+    network_settings = Option(pricli=pricli,title='Network')
+    network_settings.AddParameter('network',nemo.network)
+    network_settings.AddParameter('netmask',nemo.netmask)
+    settings.AddOption(network_settings)
+    scan_settings = Option(pricli=pricli,title='Scan settings')
+    scan_settings.AddParameter('scan_type',nemo.scan_type)
+    scan_settings.AddParameter('port_scan_period',nemo.port_scan_period)
+    scan_settings.AddParameter('port_stress',nemo.port_stress)
+    settings.AddOption(scan_settings)
+    settings.AddOption(Option(pricli=pricli,title='Port settings'))
+    settings.AddOption(Option(pricli=pricli,title='Informer settings'))
+    settings.AddOption(Option(pricli=pricli,title='Theme'))
+    settings.AddOption(Option(pricli=pricli,title='Exit'))
+
+    return settings
+
+    # settings.Draw()
+
 def StartNemo(nemo):
     mode = nemo.mode
 
@@ -738,6 +795,11 @@ def StartNemo(nemo):
         pricli = Pricli()
         nemo.SetPricli(pricli)
         network = getNetInfo(pricli)
+        # nemo.SetNetwork(network)
+        nemo.SetSetting('network',network)
+        nemo.SetSetting('netmask',network[-2:])
+        # nemo.SetSetting('dns_server',network[0:-4]+)
+        nemo.AddSettings(CreateSettings(nemo,pricli=pricli))
         if 'Exit' in network:
             Exit(pricli)
             return
