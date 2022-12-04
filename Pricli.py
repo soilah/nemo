@@ -169,7 +169,52 @@ class InfoWindow:
             pricli.ChangeCur(top_row)
             return True
         return False
-        
+
+class Option:
+    def __init__(self,pricli,title):
+        self.pricli = pricli
+        self.title = title
+        self.parameters = dict() #### The actual parameters to change
+        # self.options = [] #### maybe add support for nested options
+        self.menu = OptionsChoiceMenu(self.pricli)
+
+    def AddParameter(self,parameter,value):
+        self.parameters[parameter] = value
+
+    # def AddOption(self,option):
+        # self.options.append(option)    
+
+    def GetOptions(self):
+        return self.options
+
+    def Draw(self):
+        return self.menu.Menu(self.title,self.parameters)
+
+class Settings:
+    def __init__(self,pricli,outprog):
+        self.pricli = pricli
+        self.outprog = outprog
+        self.main_settings = []
+        self.menu = ChoiceMenu(pricli)
+
+    def AddOption(self,option):
+        self.main_settings.append(option)
+    
+    def GetOptions(self):
+        return self.main_settings
+    
+    def GetOptionsText(self):
+        return [opt.title for opt in self.main_settings]
+    
+    def Draw(self):
+        options = self.GetOptionsText()
+        choice = self.menu.Menu('Nemo Settings',choices=options)
+        if choice == len(options):
+            return -1
+        return choice
+    
+    def DrawOption(self,index):
+        return self.main_settings[index].Draw()
 
 
 class ControlPanel:
@@ -288,6 +333,82 @@ class ControlPanel:
 
     def AddControlKey(self,key,value):
         self.control_keys[key] = value
+
+class OptionsChoiceMenu:
+    def __init__(self,pricli):
+        self.pricli = pricli
+        self.choice = 1
+        self.pos = 1
+        self.key_pressed = None
+    
+    def Init(self):
+        self.choice = 1
+        self.pos = 1
+        self.key_pressed = None
+    
+    def Menu(self,title,choices): #### In this class, options must be a dictionary
+        self.Init()
+        # Loop until return key is pressed
+        while self.key_pressed !=ord('q'):
+        # pricli.screen.clear() #clears previous screen on key press and updates display based on pos
+        # pricli.screen.border(0)
+            self.pricli.Clear()
+            text = """
+░██████╗░█████╗░░█████╗░███╗░░██╗██╗░░░░░░█████╗░██████╗░
+██╔════╝██╔══██╗██╔══██╗████╗░██║██║░░░░░██╔══██╗██╔══██╗
+╚█████╗░██║░░╚═╝███████║██╔██╗██║██║░░░░░███████║██████╦╝
+░╚═══██╗██║░░██╗██╔══██║██║╚████║██║░░░░░██╔══██║██╔══██╗
+██████╔╝╚█████╔╝██║░░██║██║░╚███║███████╗██║░░██║██████╦╝
+╚═════╝░░╚════╝░╚═╝░░╚═╝╚═╝░░╚══╝╚══════╝╚═╝░░╚═╝╚═════╝░ """
+
+            self.pricli.Printblnr(text,2,1) # Title for this menu
+            self.pricli.Printblnr(title,11,2) #Subtitle for this menu
+
+            # Detects what is higlighted, every entry will have two lines, a condition if the menu is highlighted and a condition for if the menu is not highlighted
+            # to add additional menu options, just add a new if pos==(next available number) and a correspoonding else
+            # I keep exit as the last option in this menu, if you do the same make sure to update its position here and the corresponding entry in the main program
+            self.pricli.AddTab()
+            pos = 1
+
+            options = dict()
+            for parameter,value in choices.items():
+                options[pos] = parameter
+                cur_pos = self.pricli.GetPos()
+                if self.pos == pos:
+                    self.pricli.Print(str(pos) + " - "+parameter,self.pricli.GREEN)
+                else:
+                    self.pricli.Print(str(pos) + " - "+parameter,self.pricli.normal_color)
+                self.pricli.Print('\t'*int((3-len(parameter)//8))+str(value),self.pricli.normal_color)
+                pos += 1
+                self.pricli.Printlnr('\n',self.pricli.normal_color)
+                self.pricli.ChangePos(cur_pos)
+            self.key_pressed = self.pricli.Input() # Gets user input
+            
+
+            # What is user input? This needs to be updated on changed equal to teh total number of entries in the menu
+            # Users can hit a number or use the arrow keys make sure to update this when you add more entries
+            # for choice in range(1,len(choices)+1):
+                # if self.key_pressed == ord(str(choice)):
+                    # self.pos = int(choice)
+            
+            if self.key_pressed == 258: ## down arrow
+                if self.pos < len(choices):
+                    self.pos += 1
+                else: self.pos = 1
+            elif self.key_pressed == 259: ## up arrow
+                if self.pos > 1:
+                    self.pos += -1
+            # This needs to be updated on changes to equal the total number of entries in the menu
+                else: self.pos = len(choices)
+            elif self.key_pressed == ord('\n'):
+                changed_value = self.pricli.PrintInput()
+                choices[options[self.pos]] = changed_value
+
+            elif self.key_pressed != ord('q'): ## if enter not pressed, flash the screen
+                curses.flash()
+        return choices
+
+
 
 class ChoiceMenu:
     def __init__(self,pricli):
@@ -499,6 +620,9 @@ class Pricli:
         ## Locks
         self.lock = Lock()
 
+        #### Input buffer
+        self.input_buffer = ''
+
     def GetTop(self):
         return self.options.GetTop()
     
@@ -562,7 +686,24 @@ class Pricli:
     def GetWindowSize(self):
         return curses.LINES-1 , curses.COLS-1
     
-    
+    def PrintInput(self):
+        self.Print(text='Enter new value: ',line=self.screen_rows-1,pos=int(self.screen_cols/3))
+        ch = ''
+        # cur_pos = int(self.screen_cols/3)
+        cur_pos = self.GetPos()
+        self.input_buffer = ''
+        while ch != '\n':
+            ch = chr(self.Input())
+            if ch == chr(curses.KEY_BACKSPACE):
+                self.input_buffer = self.input_buffer[:-1]
+            else:
+                self.input_buffer += ch
+            self.Print(text=' '*(len(self.input_buffer)+1),pos=cur_pos)
+            self.Print(text=self.input_buffer,pos=cur_pos)
+            self.UpdatePos(-1)
+        self.ChangeCur(self.screen_rows)
+        return self.input_buffer.strip('\n')
+
     def Print(self,text,color=curses.A_NORMAL,line=None,pos=None): ## print some text and refresh the screen
         if line is not None:
             self.ChangeCur(line)
@@ -575,7 +716,7 @@ class Pricli:
         self.screen.addstr(self.GetCur(),self.GetPos(),text,curses.color_pair(color))
         self.UpdatePos(len(text))
         if '\t' in text:
-            self.UpdatePos(8)
+            self.UpdatePos(text.count('\t')*8)
         self.UpdateText(str(text))
         self.screen.refresh()
 
