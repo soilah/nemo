@@ -230,6 +230,8 @@ class ControlPanel:
         self.info_windows = []
         self.progress_line = 0
 
+        self.info_text = None
+
         # self.window_title_colors = 
         # [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
 
@@ -270,6 +272,9 @@ class ControlPanel:
     def InsertWindow(self,window):
         self.info_windows.append(window)
     
+    def AddInfoText(self,text):
+        self.info_text = text
+    
     def Draw(self):
         self.PrintBanner()
         # key_colors = []
@@ -293,7 +298,7 @@ class ControlPanel:
         
         self.pricli.UpdatePage(['\n'])
         self.pricli.UpdatePage([self.top_seperator1],[self.pricli.RED])
-        self.progress_line = self.pricli.GetCur()
+        # self.progress_line = self.pricli.GetCur()
         self.pricli.UpdatePage([self.top_seperator2],[self.pricli.GREEN])
         self.pricli.UpdatePage([self.top_seperator3],[self.pricli.RED])
         self.pricli.UpdatePage(['\n'])
@@ -304,6 +309,9 @@ class ControlPanel:
             self.info_windows[0].DrawWindow(self.pricli)
         else:
             self.DrawInfoWindows()
+        
+        if self.info_text is not None:
+            self.pricli.UpdatePage([self.info_text],[self.pricli.normal_color])
         
         self.pricli.RefreshPage()
 
@@ -915,14 +923,15 @@ class Pricli:
     def RefreshPage(self):
         self.current_view_page.PrintPage()
 
-    def UpdatePage(self,text_list,colors=None):
+    def UpdatePage(self,text_list,colors=None,refresh=False):
         self.Clear()
         self.Init()
         # self.lock.acquire()
         self.current_page.InsertLine(text_list,colors)
         # self.lock.release()
         # if self.self.current_page == self.current_view_page:
-        # self.current_view_page.PrintPage() 
+        if refresh:
+            self.current_view_page.PrintPage() 
     
     def ClearPage(self):
         self.lock.acquire()
