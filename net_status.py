@@ -2,7 +2,7 @@ from dis import disco
 from distutils.debug import DEBUG
 import os
 from pickle import FALSE
-from threading import Thread, Lock
+from threading import Event, Lock
 import sched, time
 import socket
 # from menu_launcher import *
@@ -214,7 +214,8 @@ class NetworkStatus(object):
         self.host_files = None
         self.host_json_data = []
         self.InitJson()
-        self.stopped = False
+        # self.stopped = False
+        self.stopped = Event()
     
     def Clear(self):
         for host in self.hosts:
@@ -337,17 +338,17 @@ def SimpleScan(nemo):
     pricli = nemo.pricli
     network_scanner = nemo.network_scanner
     # global network_status
-    if network_status.stopped:
+    if network_status.stopped.is_set():
         pricli.Clear()
         return
     while(1):
-        if network_status.stopped:
+        if network_status.stopped.is_set():
             pricli.Clear()
             return
 
         network_scanner.NetworkDiscovery(nemo.network)
         network_status.Update()
-        if network_status.stopped:
+        if network_status.stopped.is_set():
             pricli.Clear()
             return
 
@@ -355,7 +356,7 @@ def SimpleScan(nemo):
         pricli.Init()
         pricli.Refresh()
         
-        if network_status.stopped:
+        if network_status.stopped.is_set():
             pricli.Clear()
             return
         pricli.UpdatePage(["======================== SCAN =========================="],[pricli.RED])
@@ -414,7 +415,7 @@ def PortScan(nemo):
         for host in network_status.hosts:
             if not fancy:
                 print('Host: '+host.ip)
-            if network_status.stopped:
+            if network_status.stopped.is_set():
                 stopped = True
                 break
 
@@ -474,7 +475,7 @@ def PortScan(nemo):
             pricli.ClearPages()
 
 # def analyzer(pricli):
-#     if network_status.stopped:
+#     if network_status.stopped.is_set():
 #         pricli.Clear()
 #         return
 
@@ -628,7 +629,8 @@ def analyzer(nemo):
         # lock.release()
         # pricli.lock.release()
 
-def HostMonitor(nemo):
+def HostMonitorMenu(nemo):
+    proman = nemo.proman
     network_status = nemo.network_status
     pricli = nemo.pricli
     network_scanner = nemo.network_scanner
@@ -649,12 +651,12 @@ def HostMonitor(nemo):
     # pricli.lock.acquire()
     analyzing = True
     while analyzing:
-        thread_lock.acquire()
+        # thread_lock.acquire()
         host_index = pricli.menu.Menu('Select host to monitor.',hosts)
         if host_index == len(hosts):
             # pricli.lock.release()
             # lock.release()
-            main_lock.release()
+            # main_lock.release()
             return
         host_selected = True
         while host_selected:
@@ -663,51 +665,109 @@ def HostMonitor(nemo):
             actions = ['Status Monitor (Up/Down)','Port Monitor','Exit']
             action = pricli.menu.Menu('Select an action on host: '+host_ip,actions)
 
-            main_lock.release()
-
-            #### Port-Service Scanning with option for version scan ####
+            # main_lock.release()
             if action == 1:
-                title = ['Monitoring status of :',host_ip,' (',hostname,')']
-                title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
-                control_panel = ControlPanel(pricli,None,title,title_colors)
-                control_panel.Draw()
-
-                while not network_status.stopped:
-                    IsAlive = network_scanner.IsHostUp(host_ip)
-                    lines = ['Host is']
-                    colors =[pricli.normal_color]
-                    if IsAlive:
-                        lines.append('UP')
-                        colors.append(pricli.GREEN)
-                    else:
-                        lines.append('DOWN')
-                        colors.append(pricli.RED)
-                    
-                    info_window = InfoWindow(pricli,["Host Status"],lines,colors)
-                    control_panel.InsertWindow(info_window)
-
-                    counter = nemo.scan_period
-                    while(counter > 0):
-                        info_text = str(counter) +'  seconds until next scan.'
-                        control_panel.AddInfoText('')
-                        control_panel.Draw()
-                        counter -= 1
-                        if network_status.stopped:
-                            return
-                        time.sleep(1)
-            
-            elif action == 6: # Exit
+                host_monitor_status(nemo,host_ip,hostname)
+            if action == 2:
+                host_monitor_ports(nemo,host_ip,hostname)
+            elif action == len(actions): # Exit
                 host_selected = False
                 break
             
-            input = pricli.Input()
+            input = ''
             while input != ord('q'):
                 input = pricli.Input()
 
+            pricli.ClearPages()
+            nemo.network_status.stopped.set()
+            # pricli.ChangeWindow(reset=True)
+            proman.KillProcesses()
+            proman.JoinThreads()
+            nemo.network_status.stopped.clear()
 
 
-def host_monitor(nemo):
-    nemo.proman.StartThread(HostMonitor,(nemo,))
+
+def HostMonitorPorts(nemo,host_ip,hostname):
+    network_status = nemo.network_status
+    network_scanner = nemo.network_scanner
+    pricli = nemo.pricli
+
+    title = ['Monitoring ports of :',host_ip,' (',hostname,')']
+    title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
+
+    while not network_status.stopped.is_set():
+        control_panel = ControlPanel(pricli,None,title,title_colors)
+        control_panel.Draw()
+        IsAlive = network_scanner.IsHostUp(host_ip)
+        lines = []
+        colors = []
+        if not IsAlive:
+            text = ['Host is currently ']
+            text.append('DOWN')
+            lines.append(text)
+            colors.append([pricli.normal_color,pricli.RED])
+        else:
+            lines,colors = PortScanResults(host_ip,scan_type=nemo.scan_type,network_scanner=network_scanner,pricli=pricli)
+        
+        info_window = InfoWindow(pricli,["Host Status"],lines,colors)
+        control_panel.InsertWindow(info_window)
+
+        counter = int(nemo.scan_period)
+        while(counter > 0):
+            info_text = str(counter) +'  seconds until next scan.'
+            control_panel.AddInfoText(info_text)
+            control_panel.Draw()
+            counter -= 1
+            if nemo.network_status.stopped.is_set():
+                return
+            time.sleep(1)
+
+
+
+def HostMonitorStatus(nemo,host_ip,hostname):
+    network_status = nemo.network_status
+    network_scanner = nemo.network_scanner
+    pricli = nemo.pricli
+
+    title = ['Monitoring status of :',host_ip,' (',hostname,')']
+    title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
+
+    while not network_status.stopped.is_set():
+        control_panel = ControlPanel(pricli,None,title,title_colors)
+        control_panel.Draw()
+        IsAlive = network_scanner.IsHostUp(host_ip)
+        colors =[[pricli.normal_color]]
+        lines = []
+        text = ['Host is currently ']
+        if IsAlive:
+            text.append('UP')
+            colors.append([pricli.normal_color,pricli.GREEN])
+        else:
+            text.append('DOWN')
+            colors.append([pricli.normal_color,pricli.RED])
+
+        lines.append(text)
+        
+        info_window = InfoWindow(pricli,["Host Status"],lines,colors)
+        control_panel.InsertWindow(info_window)
+
+        counter = int(nemo.scan_period)
+        while(counter > 0):
+            info_text = str(counter) +'  seconds until next scan.'
+            control_panel.AddInfoText(info_text)
+            control_panel.Draw()
+            counter -= 1
+            if nemo.network_status.stopped.is_set():
+                return
+            time.sleep(1)
+
+    
+
+def host_monitor_status(nemo,ip,name):
+    nemo.proman.StartThread(HostMonitorStatus,(nemo,ip,name,))
+
+def host_monitor_ports(nemo,ip,name):
+    nemo.proman.StartThread(HostMonitorPorts, (nemo,ip,name,))
 
 def Informer(nemo):
     proman = nemo.proman
@@ -722,31 +782,31 @@ def Informer(nemo):
             port_scan(nemo)
         elif choice == 3:
             # lock.acquire()
-            print('getting 1 lock'+str(main_lock))
-            main_lock.acquire()
-            host_monitor(nemo)
+            # print('getting 1 lock'+str(main_lock))
+            # main_lock.acquire()
+            HostMonitorMenu(nemo)
         else:
             return
 
         key = ''
-        while key != ord('q'):
+        # while key != ord('q'):
             # if is_in_another_menu:
                 # pricli.lock.acquire()
                 # lock.acquire()
-            print('getting 2 lock'+str(main_lock))
-            main_lock.acquire()
-            key = pricli.Input()
-            if key == ord("l"):
-                if len(pricli.pages) > 1:
-                    pricli.GoToNextPage()
-            elif key == ord("k"):
-                pricli.GoToPreviousPage()
-        pricli.ClearPages()
-        nemo.network_status.stopped = True 
-        # pricli.ChangeWindow(reset=True)
-        proman.KillProcesses()
-        proman.JoinThreads()
-        nemo.network_status.stopped = False
+            # print('getting 2 lock'+str(main_lock))
+            # main_lock.acquire()
+        #     key = pricli.Input()
+        #     if key == ord("l"):
+        #         if len(pricli.pages) > 1:
+        #             pricli.GoToNextPage()
+        #     elif key == ord("k"):
+        #         pricli.GoToPreviousPage()
+        # pricli.ClearPages()
+        # nemo.network_status.stopped = True 
+        # # pricli.ChangeWindow(reset=True)
+        # proman.KillProcesses()
+        # proman.JoinThreads()
+        # nemo.network_status.stopped = False
 
 
 
@@ -763,7 +823,7 @@ def MainMenu(nemo):
         #     continue
         actions = ["Informer","Analyzer","Options","Exit"] 
         choice = pricli.menu.Menu("Select an action...",actions)
-        network_status.stopped = False
+        network_status.stopped.clear()
 
         if choice == 1:
             # pricli.ChangeWindow(reset=True)
@@ -810,10 +870,10 @@ def MainMenu(nemo):
         # is_in_another_menu = False
 
         pricli.ClearPages()
-        network_status.stopped = True 
+        network_status.stopped.set() 
         proman.KillProcesses()
         proman.JoinThreads()
-        network_status.stopped = False
+        network_status.stopped.clear()
         pricli.ChangeWindow(reset=True)
 
 def getNetInfo(pricli):

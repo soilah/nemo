@@ -95,7 +95,7 @@ class InfoWindow:
         self.colors_to_draw = []
         self.border_color = border_color 
 
-        max_width = 0
+        max_width = len(title)
         for line in lines:
             txt = ''
             for l in line:
@@ -283,6 +283,7 @@ class ControlPanel:
         self.pricli.UpdatePage(['\n'])
         self.pricli.UpdatePage(['-'*self.pricli.screen_cols])
         line = '|'
+        self.control_keys_lines = []
         for key in self.control_keys.keys():
             key_pair_string = key+": "+self.control_keys[key]+" "
             if len(key_pair_string) + len(line) > self.pricli.screen_cols:
