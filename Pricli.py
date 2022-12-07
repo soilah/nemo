@@ -302,7 +302,7 @@ class ControlPanel:
         self.control_keys_lines.append(line)
         # self.pricli.UpdatePage(['\n'])
         for line in self.control_keys_lines:
-            self.pricli.UpdatePage(line)
+            self.pricli.UpdatePage([line])
         self.pricli.UpdatePage(['-'*self.pricli.screen_cols])
         
         self.pricli.UpdatePage(['\n'])

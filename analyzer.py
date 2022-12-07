@@ -92,6 +92,7 @@ def Analyzer(nemo):
                 input = pricli.Input()
                 while input != ord('q'):
                     input = pricli.Input()
+                pricli.ClearPages()
 
 
         # lock.release()

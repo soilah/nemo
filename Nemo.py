@@ -19,12 +19,15 @@ import analyzer
 
 from Host import *
 
-main_lock = Lock()
-thread_lock = Lock()
+# main_lock = Lock()
+# thread_lock = Lock()
 
 
 class Nemo:
     def __init__(self,mode):
+        self.main_lock = Lock()
+        self.thread_lock = Lock()
+
         self.settings = None
         self.NORMAL = 0
         self.NOFANCY = 1
