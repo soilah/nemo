@@ -224,6 +224,12 @@ class NetworkStatus(object):
         # self.stopped = False
         self.stopped = Event()
     
+    def GetHostByIp(self,ip):
+        for host in self.hosts:
+            if ip == host.ip:
+                return host
+        return None
+    
     def Clear(self):
         for host in self.hosts:
             del host
@@ -432,6 +438,7 @@ def PortScan(nemo):
         counter = int(nemo.scan_period)
         while counter > 0:
             time.sleep(0.1)
+            counter -= 1
             if nemo.network_status.stopped.is_set():
                 return
 
@@ -440,7 +447,11 @@ def PortScan(nemo):
 
 
 def PortScanResults(host_ip,nemo):
-    ports = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
+    host = nemo.network_status.GetHostByIp(host_ip)
+    host.ports = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
+    host.CheckChanges()
+    host.SaveJson()
+
     pricli = nemo.pricli
 
     lines = []
@@ -448,10 +459,10 @@ def PortScanResults(host_ip,nemo):
 
     lines.append(['Ports: '])
     colors.append([pricli.GREEN])
-    if len(ports) < 1:
+    if len(host.ports) < 1:
         lines.append(['No scanned ports open'])
         colors.append([pricli.RED])
-    for port in ports:
+    for port in host.ports:
         lines.append([port.num])
         colors.append([pricli.YELLOW])
         if nemo.scan_type == 1:
