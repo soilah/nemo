@@ -41,6 +41,8 @@ class Line:
             # self.pricli.Print('Page: '+str(self.pricli.current_view_page_index)+"/"+str(len(self.pricli.pages)),curses.A_NORMAL,1,100)
             self.pricli.screen.addstr(1,100,'Page: '+str(self.pricli.current_view_page_index+1)+"/"+str(len(self.pricli.pages)))
             # self.pricli.screen.addstr(1,100,str(len(self.pricli.pages[self.pricli.current_page_index].lines))) #### UNCOMMENT THESE LINES FOR DEBUGING
+            # time.sleep(0.1)
+            # print('CURRENT POS: '+str(self.pricli.GetPos()))
             self.pricli.screen.refresh()
         self.pricli.UpdateCur()
         self.pricli.Refresh()
@@ -272,6 +274,12 @@ class ControlPanel:
     def InsertWindow(self,window):
         self.info_windows.append(window)
     
+    def UpdateWindow(self,window,index=0):
+        if len(self.info_windows) < 1:
+            self.InsertWindow(window)
+            return
+        self.info_windows[index] = window
+    
     def AddInfoText(self,text):
         self.info_text = text
     
@@ -306,10 +314,10 @@ class ControlPanel:
         self.pricli.UpdatePage(self.subtitle,self.subtitle_colors)
         self.pricli.UpdatePage(['\n'])
         
-        if len(self.info_windows) == 1:
-            self.info_windows[0].DrawWindow(self.pricli)
-        else:
-            self.DrawInfoWindows()
+        # if len(self.info_windows) == 1:
+            # self.info_windows[0].DrawWindow(self.pricli)
+        # else:
+        self.DrawInfoWindows()
         
         if self.info_text is not None:
             self.pricli.UpdatePage([self.info_text],[self.pricli.normal_color])

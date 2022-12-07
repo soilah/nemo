@@ -1,4 +1,5 @@
 from ProMan import ProMan
+import time
 from Host import Host, Port
 from SString import FindSubstr
 
@@ -119,7 +120,7 @@ class NmapParser:
     
     def ParseServiceScan(self,res,scan_type=1):
         
-        if self.network_status.stopped:
+        if self.network_status.stopped.is_set():
             # stopped = True
             return
 
@@ -146,11 +147,10 @@ class NmapParser:
                 if 'PORT' in line:
                     reached_PORT = True
                 continue
-        
         return ports
     
     def ParseOsScan(self,res):
-        if self.network_status.stopped:
+        if self.network_status.stopped.is_set():
             return
         os_info = []
         
