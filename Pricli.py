@@ -283,7 +283,7 @@ class ControlPanel:
     def AddInfoText(self,text):
         self.info_text = text
     
-    def Draw(self):
+    def Draw(self,horizontal=True):
         self.PrintBanner()
         # key_colors = []
         # key_colors.append(self.pricli.MAGENTA)
@@ -317,7 +317,8 @@ class ControlPanel:
         # if len(self.info_windows) == 1:
             # self.info_windows[0].DrawWindow(self.pricli)
         # else:
-        self.DrawInfoWindows()
+        self.pricli.ChangeTop(self.pricli.GetCur())
+        self.DrawInfoWindows(horizontal=horizontal)
         
         if self.info_text is not None:
             self.pricli.UpdatePage([self.info_text],[self.pricli.normal_color])
@@ -325,28 +326,35 @@ class ControlPanel:
         self.pricli.RefreshPage()
 
 
-    def DrawInfoWindows(self):
+    def DrawInfoWindows(self,horizontal=True):
         max_width = 0
         max_lines = 0
-        for w in self.info_windows:
-            if w.max_width < max_width:
-                max_width = w.max_width
-            if len(w.lines_to_draw) > max_lines:
-                max_lines = len(w.lines_to_draw)
-
-        for line_index in range(max_lines):
-            line = []
-            colors = []
+        if horizontal:
             for w in self.info_windows:
-                if w.HasIndex(line_index):
-                    line += w.lines_to_draw[line_index]
-                    colors += w.colors_to_draw[line_index]
-                else:
-                    line += [' '*(w.max_width+2)]
+                if w.max_width < max_width:
+                    max_width = w.max_width
+                if len(w.lines_to_draw) > max_lines:
+                    max_lines = len(w.lines_to_draw)
+
+            for line_index in range(max_lines):
+                line = []
+                colors = []
+                for w in self.info_windows:
+                    if w.HasIndex(line_index):
+                        line += w.lines_to_draw[line_index]
+                        colors += w.colors_to_draw[line_index]
+                    else:
+                        line += [' '*(w.max_width+2)]
+                        colors += [self.pricli.normal_color]
+                    line += [' '*2]
                     colors += [self.pricli.normal_color]
-                line += [' '*2]
-                colors += [self.pricli.normal_color]
-            self.pricli.UpdatePage(line,colors)
+                self.pricli.UpdatePage(line,colors)
+        else:
+            for w in self.info_windows:
+                if len(w.lines_to_draw) + self.pricli.GetCur() >= self.pricli.screen_rows:
+                    self.pricli.CreateNewPage()
+                w.DrawWindow(self.pricli)
+                self.pricli.ChangePos(1)
 
     def AddControlKey(self,key,value):
         self.control_keys[key] = value
@@ -727,8 +735,8 @@ class Pricli:
         if pos is not None:
             self.ChangePos(pos)
         
-        if self.GetCur() > self.screen_rows - 1:
-            self.ChangeCur(self.GetTop())
+        # if self.GetCur() > self.screen_rows - 1:
+        #     self.ChangeCur(self.GetTop())
         # self.UpdateLongestPos(len(text))
         self.screen.addstr(self.GetCur(),self.GetPos(),text,curses.color_pair(color))
         self.UpdatePos(len(text))

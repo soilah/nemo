@@ -379,8 +379,12 @@ def PortScan(nemo):
             pricli.Init()
             pricli.Refresh()
 
-            pricli.UpdatePage(["====================== PORT SCAN ======================"])
-            pricli.RefreshPage()
+            # pricli.UpdatePage(["====================== PORT SCAN ======================"])
+            # pricli.RefreshPage()
+            title = ['Port scan results']
+            title_colors = [pricli.normal_color]
+            control_panel = ControlPanel(pricli,None,title,title_colors)
+            control_panel.Draw()
 
         for host in network_status.hosts:
             if not fancy:
@@ -388,54 +392,64 @@ def PortScan(nemo):
             if network_status.stopped.is_set():
                 stopped = True
                 break
-
+            lines = []
+            colors = []
             if network_scanner.IsHostUp(host.ip):
-                host.ports = network_scanner.ServiceScan(host.ip,scan_type)
-                host.CheckChanges()
-                host.SaveJson()
+                # host.ports = network_scanner.ServiceScan(host.ip,scan_type)
+                # host.CheckChanges()
+                lines,colors = PortScanResults(host.ip,nemo) 
             else:
                 continue
 
             if fancy:
+                info_window_title = ["PORT INFO FOR "+host.ip+' ('+host.hostname+')']
                 ## The first section until AssessText, checks if the text to be printed will fit the screen rows. 
                 ## If not, it will be (hopefully) printed on a new column, right to the already printed ones
                 ## and on the top row.
 
-                if len(host.ports) > 0:
-                    Port_Scan_Txt = ""
-                    Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
-                    Port_Scan_Txt += "Ports:\n\t"
-                    for port in host.ports:
-                        if scan_type == 2:
-                            Port_Scan_Txt += str(port.num)+'\n\t'+port.service+"\n\t"+port.version+"\n\t"
-                        else:
-                            Port_Scan_Txt += str(port.num)+'\n\t'+port.service+'\n\t'
-                    if not pricli.AssessText(Port_Scan_Txt):
-                        pricli.CreateNewPage()
+                # if len(host.ports) > 0:
+
+                info_window = InfoWindow(pricli,info_window_title,lines,colors)
+                control_panel.InsertWindow(info_window)
+                control_panel.Draw(horizontal=False)
+                    # control_panel.InsertWindow(info_window)
+                    # control_panel.Draw(horizontal=False)
+                
+                    # Port_Scan_Txt = ""
+                    # Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
+                    # Port_Scan_Txt += "Ports:\n\t"
+                    # for port in host.ports:
+                    #     if scan_type == 2:
+                    #         Port_Scan_Txt += str(port.num)+'\n\t'+port.service+"\n\t"+port.version+"\n\t"
+                    #     else:
+                    #         Port_Scan_Txt += str(port.num)+'\n\t'+port.service+'\n\t'
+                    # if not pricli.AssessText(Port_Scan_Txt):
+                    #     pricli.CreateNewPage()
 
                     ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
-                    pricli.UpdatePage(["Host: ",host.ip," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,pricli.RED,None])
-                    pricli.UpdatePage(["Ports:"],[pricli.GREEN])
+                    # pricli.UpdatePage(["Host: ",host.ip," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,pricli.RED,None])
+                    # pricli.UpdatePage(["Ports:"],[pricli.GREEN])
                     # pricli.AddTab()
-                    for port in host.ports:
-                        Port_Scan_Txt += str(port.num)
-                        pricli.UpdatePage([str(port.num)],[pricli.YELLOW])
-                        pricli.UpdatePage(["\t"+"Service:",port.service],[pricli.RED,pricli.CYAN])
-                        if scan_type == 2: ## print version if selected
-                            pricli.UpdatePage(["\t"+"Version:",port.version],[pricli.RED,pricli.MAGENTA])
+                    # for port in host.ports:
+                    #     Port_Scan_Txt += str(port.num)
+                    #     pricli.UpdatePage([str(port.num)],[pricli.YELLOW])
+                    #     pricli.UpdatePage(["\t"+"Service:",port.service],[pricli.RED,pricli.CYAN])
+                    #     if scan_type == 2: ## print version if selected
+                    #         pricli.UpdatePage(["\t"+"Version:",port.version],[pricli.RED,pricli.MAGENTA])
 
                         # pricli.RemoveTab()
                     # pricli.RemoveTab()
-                else: 
-                    Port_Scan_Txt = ""
-                    Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
-                    Port_Scan_Txt += "No open ports found"
-                    if not pricli.AssessText(Port_Scan_Txt):
-                        pricli.CreateNewPage()
+                # else: 
+                    # Port_Scan_Txt = ""
+                    # Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
+                    # Port_Scan_Txt += "No open ports found"
+                    # if not pricli.AssessText(Port_Scan_Txt):
+                    #     pricli.CreateNewPage()
 
                     ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
-                    pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
-                    pricli.UpdatePage(['\tHas no open ports'],[pricli.GREEN])
+                    # pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
+                    # pricli.UpdatePage(['\tHas no open ports'],[pricli.GREEN])
+                    # info_window = InfoWindow(pricli,info_window_title,['No open ports found'],[pricli.RED])
 
             if fancy:
                 pricli.RefreshPage()
@@ -526,6 +540,7 @@ def MainMenu(nemo):
         # if is_in_another_menu:
         #     time.sleep(2)
         #     continue
+        # nemo.main_lock.acquire()
         actions = ["Informer","Analyzer","Options","Exit"] 
         choice = pricli.menu.Menu("Select an action...",actions)
         network_status.stopped.clear()

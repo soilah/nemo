@@ -49,7 +49,7 @@ def Analyzer(nemo):
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
                     nemo.SetScanType(1)
-                    if action == 3:
+                    if action == 2:
                         nemo.SetScanType(2)
 
                     lines,colors = Nemo.PortScanResults(host_ip,nemo)

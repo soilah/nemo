@@ -8,6 +8,7 @@ def Informer(nemo):
     while True:
         pricli = nemo.pricli
         actions = ['Simple Network Scan','Network Port Scan','Specific Host Monitor','Exit']
+        # nemo.main_lock.acquire()
         choice = pricli.menu.Menu("Select an action...",actions)
 
         if choice == 1:
@@ -73,6 +74,7 @@ def HostMonitorMenu(nemo):
         while host_selected:
             host_ip = network_status.hosts[host_index-1].ip
             hostname = network_status.hosts[host_index-1].hostname
+            # nemo.main_lock.acquire()
             actions = ['Status Monitor (Up/Down)','Port Monitor','Back']
             action = pricli.menu.Menu('Select an action on host: '+host_ip,actions)
 
@@ -88,7 +90,9 @@ def HostMonitorMenu(nemo):
 
             ## wait for thread to finish. And then go back to menu
             # nemo.main_lock.acquire()
+            time.sleep(1)
             input = ''
+
             while input != ord('q'):
                 input = pricli.Input()
 
@@ -98,6 +102,7 @@ def HostMonitorMenu(nemo):
             proman.KillProcesses()
             proman.JoinThreads()
             nemo.network_status.stopped.clear()
+            # nemo.main_lock.release()
 
 
 
