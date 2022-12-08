@@ -118,6 +118,7 @@ def HostMonitorPorts(nemo,host_ip,hostname):
         if not IsAlive:
             text = ['Host is currently ']
             text.append('DOWN')
+            colors.append([pricli.RED])
             lines.append(text)
             colors.append([pricli.normal_color,pricli.RED])
         else:

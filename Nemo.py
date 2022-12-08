@@ -83,11 +83,15 @@ class Nemo:
         self.scan_period = self.mode[3]
         self.port_stress = self.mode[4]
         self.ports_to_scan = self.mode[5]
+        self.UpdateNmapOptions()
 
+    def UpdateNmapOptions(self):
         if self.port_stress == self.SCAN_STRESS_FAST:
-            self.nmap_options.append('-F') 
+            if '-F' not in self.nmap_options:
+                self.nmap_options.append('-F') 
         elif self.port_stress == self.SCAN_STRESS_FULL:
-            self.nmap_options.append('-p1-65535')
+            if '-p1-65535' not in self.nmap_options:
+                self.nmap_options.append('-p1-65535')
 
         if self.ports_to_scan is not None:
             self.nmap_options.append(self.ports_to_scan)
@@ -100,6 +104,7 @@ class Nemo:
     
     def SetSetting(self,key,value):
         setattr(self,key,value)
+        self.UpdateNmapOptions()
     
     def ChangeMember(self,member,value):
         member = value
@@ -554,7 +559,6 @@ def MainMenu(nemo):
         elif choice == len(actions):
             Exit(pricli)
             break
-        ### skata
 
         key = ''
         while key != ord('q'):
