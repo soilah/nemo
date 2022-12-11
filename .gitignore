@@ -2,3 +2,4 @@
 **/Networks
 *.swp
 *TelegramBot.py
+*SendMail.py

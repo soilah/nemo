@@ -88,16 +88,19 @@ class Page: #### represents a screen page as seen by the human eye
     # * Line4        *
     # ****************
 class InfoWindow:
-    def __init__(self,pricli,title,lines,colors,border_color = curses.COLOR_RED):
+    def __init__(self,pricli,title,lines,colors,border_color = None):
         self.pricli = pricli
         self.title = title
         self.lines = lines
         self.colors = colors
         self.lines_to_draw = []
         self.colors_to_draw = []
-        self.border_color = border_color 
+        if border_color is None:
+            self.border_color = pricli.GREEN
+        else:
+            self.border_color = border_color 
 
-        max_width = len(title)
+        max_width = 0
         for line in lines:
             txt = ''
             for l in line:
@@ -107,6 +110,12 @@ class InfoWindow:
                 length += 8
             if length > max_width:
                 max_width = len(txt)
+        line_str = ''
+        for l in title:
+            line_str += l
+        
+        if len(line_str) > max_width:
+            max_width = len(line_str)
 
         self.max_width = max_width
 
@@ -115,13 +124,22 @@ class InfoWindow:
         self.colors_to_draw.append([self.border_color])
         # colors = []
         # self.title.insert(0,'*')
+        title_colors = self.colors[0]
         self.title.insert(0,'*')
-        self.title[1] = self.CenterText(self.title[1])
+        if self.max_width != len(line_str):
+            if len(self.title) == 2:
+                self.title[1] = self.CenterText(line_str)
+            else:
+                spaces = self.CenterText(line_str,spaces_only=True)
+                self.title.insert(1,spaces)
+                title_colors.insert(0,self.pricli.normal_color)
+
         self.title.append(self.CreateTrailingText(self.title))
         self.lines_to_draw.append(self.title)
-        title_colors = self.colors[0]
+
         title_colors.insert(0,self.border_color)
         title_colors.append(self.border_color)
+
         self.colors_to_draw.append(title_colors)
 
         self.lines_to_draw.append(['*'*(self.max_width+2)])
@@ -149,11 +167,15 @@ class InfoWindow:
         spaces = (self.max_width - len(txt) + 1)*' '
         return spaces + '*'
     
-    def CenterText(self,text):
+    def CenterText(self,text,spaces_only=False):
         spaces = 0
         while spaces + int(len(text)/2) < int(self.max_width/2):
             spaces += 1
-        return spaces*' '+text
+        if spaces_only:
+            return spaces*' '
+        else:
+            return spaces*' '+text
+    
 
     def HasIndex(self,index):
         if index >= len(self.lines_to_draw):
@@ -238,6 +260,7 @@ class ControlPanel:
         # [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
 
         self.pricli = pricli
+        self.total_lines = self.pricli.GetTop()
         self.control_keys['q'] = 'Quit'
         self.control_keys['k'] = 'Previous Page'
         self.control_keys['l'] = 'Next Page'
@@ -272,6 +295,7 @@ class ControlPanel:
         # self.pricli.UpdatePage([title]) #Subtitle for this menu
     
     def InsertWindow(self,window):
+        self.total_lines += len(window.lines_to_draw)
         self.info_windows.append(window)
     
     def UpdateWindow(self,window,index=0):
@@ -351,6 +375,8 @@ class ControlPanel:
                 self.pricli.UpdatePage(line,colors)
         else:
             for w in self.info_windows:
+                print(str(self.total_lines + self.pricli.GetCur()) + " actual and full: "+str(self.pricli.screen_rows))
+                time.sleep(5)
                 if len(w.lines_to_draw) + self.pricli.GetCur() >= self.pricli.screen_rows:
                     self.pricli.CreateNewPage()
                 w.DrawWindow(self.pricli)

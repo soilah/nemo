@@ -48,9 +48,7 @@ def Analyzer(nemo):
                     title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
-                    nemo.SetScanType(1)
-                    if action == 2:
-                        nemo.SetScanType(2)
+                    nemo.SetScanType(int(action))
 
                     lines,colors = Nemo.PortScanResults(host_ip,nemo)
                        

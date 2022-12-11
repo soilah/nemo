@@ -397,12 +397,13 @@ def PortScan(nemo):
             if network_scanner.IsHostUp(host.ip):
                 # host.ports = network_scanner.ServiceScan(host.ip,scan_type)
                 # host.CheckChanges()
-                lines,colors = PortScanResults(host.ip,nemo) 
+                lines,colors = PortScanResults(host.ip,nemo,[[pricli.normal_color,pricli.RED,pricli.normal_color,pricli.BLUE,pricli.normal_color]]) 
             else:
                 continue
 
             if fancy:
-                info_window_title = ["PORT INFO FOR "+host.ip+' ('+host.hostname+')']
+                # info_window_title = ["PORT INFO FOR ",host.ip,' (',host.hostname,')']
+                info_window_title = ["PORT INFO FOR ",host.ip,' (',host.hostname,')']
                 ## The first section until AssessText, checks if the text to be printed will fit the screen rows. 
                 ## If not, it will be (hopefully) printed on a new column, right to the already printed ones
                 ## and on the top row.
@@ -465,7 +466,7 @@ def PortScan(nemo):
             pricli.ClearPages()
 
 
-def PortScanResults(host_ip,nemo):
+def PortScanResults(host_ip,nemo,colr=None):
     host = nemo.network_status.GetHostByIp(host_ip)
     host.ports = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
     host.CheckChanges()
@@ -474,7 +475,11 @@ def PortScanResults(host_ip,nemo):
     pricli = nemo.pricli
 
     lines = []
-    colors = [[pricli.RED]]
+    colors = []
+    if colr is None:
+        colors = [[pricli.RED]]
+    else:
+        colors = colr
 
     lines.append(['Ports: '])
     colors.append([pricli.GREEN])
