@@ -39,7 +39,7 @@ class Line:
                 color = self.colors[index]
             self.pricli.Print(self.line[index],color,row,col)
             # self.pricli.Print('Page: '+str(self.pricli.current_view_page_index)+"/"+str(len(self.pricli.pages)),curses.A_NORMAL,1,100)
-            self.pricli.screen.addstr(1,100,'Page: '+str(self.pricli.current_view_page_index+1)+"/"+str(len(self.pricli.pages)))
+            self.pricli.screen.addstr(1,int(self.pricli.screen_cols/2),'Page: '+str(self.pricli.current_view_page_index+1)+"/"+str(len(self.pricli.pages)))
             # self.pricli.screen.addstr(1,100,str(len(self.pricli.pages[self.pricli.current_page_index].lines))) #### UNCOMMENT THESE LINES FOR DEBUGING
             # time.sleep(0.1)
             # print('CURRENT POS: '+str(self.pricli.GetPos()))
@@ -253,6 +253,7 @@ class ControlPanel:
         self.subtitle_colors = subtitle_colors
         self.info_windows = []
         self.progress_line = 0
+        self.top_pos = 17
 
         self.info_text = None
 
@@ -261,6 +262,8 @@ class ControlPanel:
 
         self.pricli = pricli
         self.total_lines = self.pricli.GetTop()
+        self.current_page = 1
+        self.lines_per_page = [0]
         self.control_keys['q'] = 'Quit'
         self.control_keys['k'] = 'Previous Page'
         self.control_keys['l'] = 'Next Page'
@@ -291,11 +294,19 @@ class ControlPanel:
         self.pricli.UpdatePage([b4]) # Title for this menu
         self.pricli.UpdatePage([b5]) # Title for this menu
         self.pricli.UpdatePage([b6]) # Title for this menu
+
+        # self.pricli.UpdateTop(6)
+        # self.UpdateTopPos(6)
         # self.pricli.UpdateCur(text.count('\n'))
         # self.pricli.UpdatePage([title]) #Subtitle for this menu
     
     def InsertWindow(self,window):
-        self.total_lines += len(window.lines_to_draw)
+        # self.total_lines += len(window.lines_to_draw)
+        if self.top_pos + self.lines_per_page[self.current_page-1] + len(window.lines_to_draw) > self.pricli.screen_rows:
+            self.lines_per_page.append(len(window.lines_to_draw))
+            self.current_page += 1
+        else:
+            self.lines_per_page[self.current_page-1] += len(window.lines_to_draw)
         self.info_windows.append(window)
     
     def UpdateWindow(self,window,index=0):
@@ -307,7 +318,13 @@ class ControlPanel:
     def AddInfoText(self,text):
         self.info_text = text
     
-    def Draw(self,horizontal=True):
+    def SetTopPos(self,pos):
+        self.top_pos = pos
+    
+    def UpdateTopPos(self,pos):
+        self.top_pos += pos
+    
+    def Draw(self,horizontal=True,drawInfowindow=True):
         self.PrintBanner()
         # key_colors = []
         # key_colors.append(self.pricli.MAGENTA)
@@ -325,8 +342,11 @@ class ControlPanel:
         line += '|'
         self.control_keys_lines.append(line)
         # self.pricli.UpdatePage(['\n'])
+        # self.pricli.UpdateTop(2)
+        # self.UpdateTopPos(2)
         for line in self.control_keys_lines:
             self.pricli.UpdatePage([line])
+            # self.UpdateTopPos(1)
         self.pricli.UpdatePage(['-'*self.pricli.screen_cols])
         
         self.pricli.UpdatePage(['\n'])
@@ -337,12 +357,16 @@ class ControlPanel:
         self.pricli.UpdatePage(['\n'])
         self.pricli.UpdatePage(self.subtitle,self.subtitle_colors)
         self.pricli.UpdatePage(['\n'])
-        
+
+        # self.pricli.UpdateTop(8)
+        # self.UpdateTopPos(8)
+        # self.SetTopPos(self.pricli.GetTop())
         # if len(self.info_windows) == 1:
             # self.info_windows[0].DrawWindow(self.pricli)
         # else:
-        self.pricli.ChangeTop(self.pricli.GetCur())
-        self.DrawInfoWindows(horizontal=horizontal)
+        # self.pricli.ChangeTop(self.pricli.GetCur())
+        if drawInfowindow:
+            self.DrawInfoWindows(horizontal=horizontal)
         
         if self.info_text is not None:
             self.pricli.UpdatePage([self.info_text],[self.pricli.normal_color])
@@ -375,10 +399,14 @@ class ControlPanel:
                 self.pricli.UpdatePage(line,colors)
         else:
             for w in self.info_windows:
-                print(str(self.total_lines + self.pricli.GetCur()) + " actual and full: "+str(self.pricli.screen_rows))
-                time.sleep(5)
-                if len(w.lines_to_draw) + self.pricli.GetCur() >= self.pricli.screen_rows:
-                    self.pricli.CreateNewPage()
+                # print('top: '+str(self.pricli.GetTop()))
+                # print(str(self.total_lines + self.top_pos) + " actual and full: "+str(self.pricli.screen_rows))
+                # time.sleep(1)
+                # time.sleep(1)
+                # if self.lines_per_page[self.current_page-1] + self.top_pos + len(w.lines_to_draw) >= self.pricli.screen_rows:
+                #     self.pricli.CreateNewPage()
+                #     self.Draw(drawInfowindow=False)
+                    # self.current_page += 1
                 w.DrawWindow(self.pricli)
                 self.pricli.ChangePos(1)
 
@@ -705,6 +733,8 @@ class Pricli:
         self.options.ChangeCur(self.options.GetCur() + cur)
     def UpdatePos(self,pos=1):
         self.options.ChangePos(self.options.GetPos() + pos)
+    def UpdateTop(self,top=1):
+        self.options.ChangeTop(self.options.GetTop() + top)
 
     def UpdateLongestPos(self,text_length):
         if self.GetPos() + text_length > self.longest_pos:

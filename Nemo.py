@@ -325,33 +325,44 @@ def SimpleScan(nemo):
         if network_status.stopped.is_set():
             pricli.Clear()
             return
-        pricli.UpdatePage(["======================== SCAN =========================="],[pricli.RED])
+
+        art_width = int(pricli.screen_cols/3)
+        pricli.UpdatePage(['='*int((art_width - 6)/2)+" SCAN "+'='*int((art_width - 5)/2)],[pricli.RED])
         pricli.UpdatePage(["Found ", str(network_status.numHosts)," total hosts"],[pricli.WHITE, pricli.YELLOW, pricli.YELLOW])
-        pricli.UpdatePage(["======================== SCAN =========================="],[pricli.RED])
+        pricli.UpdatePage(['='*int((art_width - 6)/2)+" SCAN "+'='*int((art_width - 5)/2)],[pricli.RED])
+
+        number_of_spaces = int(pricli.screen_cols/10)
+
+        pricli.UpdatePage(['IP'+' '*number_of_spaces+'MAC'+' '*number_of_spaces+'HOSTNAME'])
+        pricli.UpdatePage(['\n'])
 
         for host in network_status.hosts:
-
             ScanText = host.ip + '\t' + host.hostname
             if not pricli.AssessText(ScanText):
                 pricli.CreateNewPage()
-            pricli.UpdatePage([host.ip,"\t",host.hostname],[pricli.BLUE,pricli.WHITE,pricli.RED])
+            pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.RED])
 
         if len(network_status.new_hosts):
-            pricli.UpdatePage(["==================== New hosts ======================="])
-
+            pricli.UpdatePage(['\n'])
+            pricli.UpdatePage(['='*int((art_width - 10)/2)+" New hosts "+'='*int((art_width - 11)/2)],[pricli.MAGENTA])
             for host in network_status.new_hosts:
-                pricli.UpdatePage([host.ip,"\t",host.hostname],[pricli.BLUE,pricli.WHITE,pricli.RED])
+                host.NotifyUp()
+                pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.RED])
 
         if len(network_status.disconnected):
-            pricli.UpdatePage(["==================== Disconnected hosts ======================="])
+            pricli.UpdatePage(['\n'])
+            pricli.UpdatePage(['='*int((art_width - 20)/2)+" Disconnected hosts "+'='*int((art_width - 20)/2)],[pricli.GREEN])
             for host in network_status.disconnected:
-                pricli.UpdatePage([host.ip,"\t",host.hostname],[pricli.BLUE,pricli.WHITE,pricli.RED])
+                host.NotifyDown()
+                pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.RED])
+
         pricli.RefreshPage()
         counter = int(nemo.scan_period)
         while counter > 0:
             time.sleep(0.1)
             if nemo.network_status.stopped.is_set():
                 return
+            counter -= 0.1
         pricli.ClearPages()
 
 def port_scan(nemo):
@@ -363,14 +374,12 @@ def PortScan(nemo):
     network_status = nemo.network_status
     network_scanner = nemo.network_scanner
     fancy = nemo.fancy
-    scan_type = nemo.scan_type
-    scan_period = nemo.scan_period
     stopped = False
     while True:
+
         if stopped:
             break
-        # UpdateHosts(network_status,pricli,locking=False)
-        # network_status.Update()
+
         network_scanner.NetworkDiscovery(nemo.network)
         network_status.Update()
 
@@ -378,13 +387,6 @@ def PortScan(nemo):
             pricli.Clear()
             pricli.Init()
             pricli.Refresh()
-
-            # pricli.UpdatePage(["====================== PORT SCAN ======================"])
-            # pricli.RefreshPage()
-            title = ['Port scan results']
-            title_colors = [pricli.normal_color]
-            control_panel = ControlPanel(pricli,None,title,title_colors)
-            control_panel.Draw()
 
         for host in network_status.hosts:
             if not fancy:
@@ -402,63 +404,19 @@ def PortScan(nemo):
                 continue
 
             if fancy:
-                # info_window_title = ["PORT INFO FOR ",host.ip,' (',host.hostname,')']
-                info_window_title = ["PORT INFO FOR ",host.ip,' (',host.hostname,')']
-                ## The first section until AssessText, checks if the text to be printed will fit the screen rows. 
-                ## If not, it will be (hopefully) printed on a new column, right to the already printed ones
-                ## and on the top row.
+                lines.insert(0,["PORT INFO FOR ",host.ip,' (',host.hostname,')'])
+                if len(lines) + pricli.current_page.current_line > pricli.screen_rows:
+                    pricli.CreateNewPage()
 
-                # if len(host.ports) > 0:
-
-                info_window = InfoWindow(pricli,info_window_title,lines,colors)
-                control_panel.InsertWindow(info_window)
-                control_panel.Draw(horizontal=False)
-                    # control_panel.InsertWindow(info_window)
-                    # control_panel.Draw(horizontal=False)
-                
-                    # Port_Scan_Txt = ""
-                    # Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
-                    # Port_Scan_Txt += "Ports:\n\t"
-                    # for port in host.ports:
-                    #     if scan_type == 2:
-                    #         Port_Scan_Txt += str(port.num)+'\n\t'+port.service+"\n\t"+port.version+"\n\t"
-                    #     else:
-                    #         Port_Scan_Txt += str(port.num)+'\n\t'+port.service+'\n\t'
-                    # if not pricli.AssessText(Port_Scan_Txt):
-                    #     pricli.CreateNewPage()
-
-                    ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
-                    # pricli.UpdatePage(["Host: ",host.ip," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,pricli.RED,None])
-                    # pricli.UpdatePage(["Ports:"],[pricli.GREEN])
-                    # pricli.AddTab()
-                    # for port in host.ports:
-                    #     Port_Scan_Txt += str(port.num)
-                    #     pricli.UpdatePage([str(port.num)],[pricli.YELLOW])
-                    #     pricli.UpdatePage(["\t"+"Service:",port.service],[pricli.RED,pricli.CYAN])
-                    #     if scan_type == 2: ## print version if selected
-                    #         pricli.UpdatePage(["\t"+"Version:",port.version],[pricli.RED,pricli.MAGENTA])
-
-                        # pricli.RemoveTab()
-                    # pricli.RemoveTab()
-                # else: 
-                    # Port_Scan_Txt = ""
-                    # Port_Scan_Txt += "Host: "+host.ip+" ("+host.hostname+")\n"
-                    # Port_Scan_Txt += "No open ports found"
-                    # if not pricli.AssessText(Port_Scan_Txt):
-                    #     pricli.CreateNewPage()
-
-                    ## Assessment finished, will now try to print the actual formated (with colors etc. ) text
-                    # pricli.UpdatePage(["Host: ",host.ip,"\t"," (",host.hostname,")"],[pricli.WHITE,pricli.BLUE,None,None,pricli.RED,None])
-                    # pricli.UpdatePage(['\tHas no open ports'],[pricli.GREEN])
-                    # info_window = InfoWindow(pricli,info_window_title,['No open ports found'],[pricli.RED])
-
+                for line_index in range(len(lines)):
+                    pricli.UpdatePage(lines[line_index],colors[line_index])
             if fancy:
                 pricli.RefreshPage()
 
         counter = int(nemo.scan_period)
         while counter > 0:
             time.sleep(0.1)
-            counter -= 1
+            counter -= 0.1
             if nemo.network_status.stopped.is_set():
                 return
 

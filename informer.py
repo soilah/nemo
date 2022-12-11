@@ -137,12 +137,12 @@ def HostMonitorPorts(nemo,host_ip,hostname):
             info_text = str(counter) +'  seconds until next scan.'
             control_panel.AddInfoText(info_text)
             control_panel.Draw()
-            counter -= 1
+            counter -= 0.1
             if nemo.network_status.stopped.is_set():
                 # nemo.main_lock.release()
                 pricli.ClearPages()
                 return
-            time.sleep(1)
+            time.sleep(0.1)
         
     # nemo.main_lock.release()
     pricli.ClearPages()
