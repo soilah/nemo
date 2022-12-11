@@ -58,6 +58,7 @@ class NmapParser:
         self.result_text = result
         lines = result.split('\n') ## Breaks the Nmap output into a list of its lines.
         lines.pop(len(lines)-1)    ## But it has to remove the last element which is an empty string
+        lines.pop(0)    ## But it has to remove the last element which is an empty string
         self.network_status.disconnected = []
         self.network_status.new_hosts = []
 
@@ -83,16 +84,22 @@ class NmapParser:
 
         new_hosts = []
         host_id = 0
-        mac = 'LOCALHOST'
+        mac = '____LOCALHOST____'
         ip = ""
         hostname = ""
-        for line in lines:
+        for line_index in range(0,len(lines),3):
             host_found = False
-            if 'MAC' in line:
-                mac = FindSubstr(line,'MAC Address:',' (').strip()
-            if 'Nmap scan report' in line:
+            batch = lines[line_index:line_index+3]
+            # print(batch)
+            # time.sleep(2)
+            if 'MAC' in batch[2]:
+                mac = FindSubstr(batch[2],'MAC Address:',' (').strip()
+            elif 'done' in batch[2]:
+                mac = '____LOCALHOST____'
+            if 'Nmap scan report' in batch[0]:
                 # line = lines[i]
                 ### If the 'Nmap' line contains '(': it has info about the hostname
+                line = batch[0]
                 if '(' in line: ### Parse Hostname and Ip 
                     ip_index = line.find('(')+1
                     host_index = line.find("for") + 4
