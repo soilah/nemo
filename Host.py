@@ -1,6 +1,6 @@
 import json
 import os
-from TelegramBot import SendMessage
+# from TelegramBot import SendMessage
 from SendMail import SendMail
 
 class Port(object):
