@@ -97,6 +97,15 @@ class Host(object):
             print(message)
             SendMail('CLOSED PORT ALERT',message)
             # SendMessage(message)
+    
+    def NotifyUp(self):
+        message = 'Host '+self.ip +' ('+self.hostname+') with mac: '+self.mac+' is UP'
+        SendMail('NEW HOST ALIVE',message)
+
+    def NotifyDown(self):
+        message = 'Host '+self.ip +' ('+self.hostname+') with mac: '+self.mac+' is DOWN'
+        SendMail('HOST DOWN',message)
+
 
 
         
