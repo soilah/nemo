@@ -460,26 +460,31 @@ def PortScanResults(host_ip,nemo,colr=None):
 def OsDetectionResults(host_ip,nemo):
     pricli = nemo.pricli 
     os = nemo.network_scanner.OsScan(host_ip)
-
     lines = []
     colors = []
     colors.append([pricli.RED])
-    lines.append(['Mac Address: ',os[0]])
-    colors.append([pricli.normal_color,pricli.YELLOW])
 
-    if len(os) > 1:
-
-        lines.append(['Device Type: ',os[1]])
-        colors.append([pricli.normal_color,pricli.YELLOW])
-        lines.append(['Running: ',os[2]])
-        colors.append([pricli.normal_color,pricli.YELLOW])
-        lines.append(['OS CPE: ',os[3]])
-        colors.append([pricli.normal_color,pricli.YELLOW])
-        lines.append(['OS Details: ',os[4]])
-        colors.append([pricli.normal_color,pricli.YELLOW])
+    if os is None:
+        lines.append(['Could not determine OS.', 'Maybe that host is on another network?'])
+        colors.append([pricli.RED,pricli.YELLOW])
     else:
-        lines.append(['OS: ','Unknown'])
+
+        lines.append(['Mac Address: ',os[0]])
         colors.append([pricli.normal_color,pricli.YELLOW])
+
+        if len(os) > 1:
+
+            lines.append(['Device Type: ',os[1]])
+            colors.append([pricli.normal_color,pricli.YELLOW])
+            lines.append(['Running: ',os[2]])
+            colors.append([pricli.normal_color,pricli.YELLOW])
+            lines.append(['OS CPE: ',os[3]])
+            colors.append([pricli.normal_color,pricli.YELLOW])
+            lines.append(['OS Details: ',os[4]])
+            colors.append([pricli.normal_color,pricli.YELLOW])
+        else:
+            lines.append(['OS: ','Unknown'])
+            colors.append([pricli.normal_color,pricli.YELLOW])
     return lines,colors
 
    

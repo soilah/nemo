@@ -87,15 +87,23 @@ class NmapParser:
         mac = '____LOCALHOST____'
         ip = ""
         hostname = ""
+        ### Bool variable to check if MAC addresses are shown in output ###
+        mac_shown = False
+
+        for line in lines:
+            if 'MAC' in line:
+                mac_shown = True
+
         for line_index in range(0,len(lines),3):
             host_found = False
             batch = lines[line_index:line_index+3]
             # print(batch)
             # time.sleep(2)
-            if 'MAC' in batch[2]:
-                mac = FindSubstr(batch[2],'MAC Address:',' (').strip()
-            elif 'done' in batch[2]:
-                mac = '____LOCALHOST____'
+            if mac_shown:
+                if 'MAC' in batch[2]:
+                    mac = FindSubstr(batch[2],'MAC Address:',' (').strip()
+                elif 'done' in batch[2]:
+                    mac = '____LOCALHOST____'
             if 'Nmap scan report' in batch[0]:
                 # line = lines[i]
                 ### If the 'Nmap' line contains '(': it has info about the hostname
@@ -167,8 +175,12 @@ class NmapParser:
             os_info.append(FindSubstr(res,'Running:'))
             os_info.append(FindSubstr(res,'OS CPE:'))
             os_info.append(FindSubstr(res,'OS details:'))
-        elif 'No exact' in res or 'Too many' in res:
+
+        elif 'No exact' in res or 'Too many' in res in res:
             os_info.append(FindSubstr(res,'MAC Address'))
+
+        elif 'unreliable' in res:
+            return None
 
         return os_info
 
