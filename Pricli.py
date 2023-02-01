@@ -11,10 +11,10 @@ import time
 import random
 from threading import Lock
 
-test_string = "ddd6989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891698916989169891ddddddd"
-test_list = ["Giorgos",'\t',"Halios"]
-colors = [curses.COLOR_GREEN, curses.A_NORMAL, curses.COLOR_RED]
 
+#### This class represents a line that may or may not have colors
+#### It is used by the page class in order to simulate a page
+#### as seen by the human eye.
 
 class Line:
     def __init__(self,pricli,line,colors=None):
@@ -28,21 +28,13 @@ class Line:
 
 
     def PrintLine(self,row=None,col=None):
-        # if row is None:
-            # row = self.pricli.GetCur()
-        # if col is None:
-            # col = self.pricli.GetPos()
         current_pos = self.pricli.GetPos()
         for index in range(0,len(self.line)):
             color = self.pricli.normal_color
             if self.colors[index] is not None:
                 color = self.colors[index]
             self.pricli.Print(self.line[index],color,row,col)
-            # self.pricli.Print('Page: '+str(self.pricli.current_view_page_index)+"/"+str(len(self.pricli.pages)),curses.A_NORMAL,1,100)
             self.pricli.screen.addstr(1,int(self.pricli.screen_cols/2),'Page: '+str(self.pricli.current_view_page_index+1)+"/"+str(len(self.pricli.pages)))
-            # self.pricli.screen.addstr(1,100,str(len(self.pricli.pages[self.pricli.current_page_index].lines))) #### UNCOMMENT THESE LINES FOR DEBUGING
-            # time.sleep(0.1)
-            # print('CURRENT POS: '+str(self.pricli.GetPos()))
             self.pricli.screen.refresh()
         self.pricli.UpdateCur()
         self.pricli.Refresh()
@@ -50,8 +42,10 @@ class Line:
 
 
 
+#### This class represents a page as seen by the human eye
+#### It is comprised of lines (Line class)
 
-class Page: #### represents a screen page as seen by the human eye
+class Page: 
     def __init__(self,pricli):
         self.lines = []
         self.current_line = 0
@@ -66,7 +60,6 @@ class Page: #### represents a screen page as seen by the human eye
         self.current_line += 1
     
     def PrintPage(self):
-        # self.pricli.ChangeCur(self.pricli.GetTop())
         for line in self.lines:
             line.PrintLine()
         self.pricli.Init()
@@ -80,7 +73,7 @@ class Page: #### represents a screen page as seen by the human eye
 
     #### An Info Window looks like: 
     # ****************
-    # * Title        *
+    # *    Title     *
     # ****************
     # * Line1        *
     # * Line2        *
@@ -194,52 +187,15 @@ class InfoWindow:
             return True
         return False
 
-class Option:
-    def __init__(self,pricli,title):
-        self.pricli = pricli
-        self.title = title
-        self.parameters = dict() #### The actual parameters to change
-        # self.options = [] #### maybe add support for nested options
-        self.menu = OptionsChoiceMenu(self.pricli)
 
-    def AddParameter(self,parameter,value):
-        self.parameters[parameter] = value
-
-    # def AddOption(self,option):
-        # self.options.append(option)    
-
-    def GetOptions(self):
-        return self.options
-
-    def Draw(self):
-        return self.menu.Menu(self.title,self.parameters)
-
-class Settings:
-    def __init__(self,pricli,outprog):
-        self.pricli = pricli
-        self.outprog = outprog
-        self.main_settings = []
-        self.menu = ChoiceMenu(pricli)
-
-    def AddOption(self,option):
-        self.main_settings.append(option)
-    
-    def GetOptions(self):
-        return self.main_settings
-    
-    def GetOptionsText(self):
-        return [opt.title for opt in self.main_settings]
-    
-    def Draw(self):
-        options = self.GetOptionsText()
-        choice = self.menu.Menu('Nemo Settings',choices=options)
-        if choice == len(options):
-            return -1
-        return choice
-    
-    def DrawOption(self,index):
-        return self.main_settings[index].Draw()
-
+#### This is an interface that may come handy when someone
+#### wants some info to be shown repeatedly and do actions
+#### let's say with some key strokes. It has a banner
+#### printed on top, then it shows the key bindings that
+#### are assigned by the user in order to do anything they
+#### may want. Next, a colored seperator is shown and then
+#### the space where the main (colored) text will appear.
+#### It currently does not support more than one pages.
 
 class ControlPanel:
     def __init__(self,pricli,banner_text,subtitle,subtitle_colors):
@@ -413,6 +369,68 @@ class ControlPanel:
     def AddControlKey(self,key,value):
         self.control_keys[key] = value
 
+#### This class represents a list that has options to be changed
+#### inside a settings menu. If the settings menu has options
+#### such as screen, sound etc, the Option class will have the
+#### title of 'screen' and a list with all the assignale options
+#### that may be inside a 'screen' options menu.
+
+
+class Option:
+    def __init__(self,pricli,title):
+        self.pricli = pricli
+        self.title = title
+        self.parameters = dict() #### The actual parameters to change
+        # self.options = [] #### maybe add support for nested options
+        self.menu = OptionsChoiceMenu(self.pricli)
+
+    def AddParameter(self,parameter,value):
+        self.parameters[parameter] = value
+
+    # def AddOption(self,option):
+        # self.options.append(option)    
+
+    def GetOptions(self):
+        return self.options
+
+    def Draw(self):
+        return self.menu.Menu(self.title,self.parameters)
+
+#### Represents a Settings menu, which has many options.
+#### This is a typical, simple menu which simulates
+#### the classic settings everybody knows of.
+
+class Settings:
+    def __init__(self,pricli,outprog):
+        self.pricli = pricli
+        self.outprog = outprog
+        self.main_settings = []
+        self.menu = ChoiceMenu(pricli)
+
+    def AddOption(self,option):
+        self.main_settings.append(option)
+    
+    def GetOptions(self):
+        return self.main_settings
+    
+    def GetOptionsText(self):
+        return [opt.title for opt in self.main_settings]
+    
+    def Draw(self):
+        options = self.GetOptionsText()
+        choice = self.menu.Menu('Nemo Settings',choices=options)
+        if choice == len(options):
+            return -1
+        return choice
+    
+    def DrawOption(self,index):
+        return self.main_settings[index].Draw()
+
+#### This is a version of the ChoiceMenu class that is
+#### used only by the Options class. It actually is the
+#### menu shown to the user when enters a specific
+#### option in the settings menu.
+
 class OptionsChoiceMenu:
     def __init__(self,pricli):
         self.pricli = pricli
@@ -446,6 +464,7 @@ class OptionsChoiceMenu:
             # Detects what is higlighted, every entry will have two lines, a condition if the menu is highlighted and a condition for if the menu is not highlighted
             # to add additional menu options, just add a new if pos==(next available number) and a correspoonding else
             # I keep exit as the last option in this menu, if you do the same make sure to update its position here and the corresponding entry in the main program
+
             self.pricli.AddTab()
             pos = 1
 
@@ -464,11 +483,6 @@ class OptionsChoiceMenu:
             self.key_pressed = self.pricli.Input() # Gets user input
             
 
-            # What is user input? This needs to be updated on changed equal to teh total number of entries in the menu
-            # Users can hit a number or use the arrow keys make sure to update this when you add more entries
-            # for choice in range(1,len(choices)+1):
-                # if self.key_pressed == ord(str(choice)):
-                    # self.pos = int(choice)
             
             if self.key_pressed == 258: ## down arrow
                 if self.pos < len(choices):
@@ -481,6 +495,12 @@ class OptionsChoiceMenu:
                 else: self.pos = len(choices)
             elif self.key_pressed == ord('\n'):
                 changed_value = self.pricli.PrintInput()
+                if 'True' in changed_value or 'true' in changed_value or '1' in changed_value or changed_value == 1:
+                    print("TRUE")
+                    changed_value = True
+                elif 'False' in changed_value or 'false' in changed_value or '0' in changed_value or changed_value == 0:
+                    print("FALSE")
+                    changed_value = False
                 choices[options[self.pos]] = changed_value
 
             elif self.key_pressed != ord('q'): ## if enter not pressed, flash the screen
@@ -488,6 +508,11 @@ class OptionsChoiceMenu:
         return choices
 
 
+#### A simple menu that is traversed with UP/DOWN arrows and 
+#### each element is selected when clicking ENTER.
+#### The current selected option text has the highlighted
+#### color specified by the Pricli object which is mandatory
+#### and passed in the constructor.
 
 class ChoiceMenu:
     def __init__(self,pricli):
@@ -557,7 +582,10 @@ class ChoiceMenu:
 
 
 
-
+#### A class that is used by the Pricli class and holds
+#### information about the cursor position (y and x).
+#### It also holds a top position, from which and below
+#### Pricli begins to print its text and lines.
 
 class WindowOptions:
     def __init__(self):
@@ -602,6 +630,26 @@ class WindowOptions:
     
     def UpdateText(self,text):
         self.text += text
+
+
+#### This is the main class of the Pricli Module. It wraps
+#### and uses the curses library. The logic behind this class
+#### is that it has two (more to be added) screen objects in 
+#### either of which the user can add lines, or simple text
+#### and choose the one that is actually shown. In that way,
+#### there may be different text in both screens and change
+#### between them without losing the data, (colored) lines,
+#### text etc. on each of the screens. The main logic of the
+#### Pricli module is that it utilizes the screen objects with
+#### the Page classes, so that each screen object prints info
+#### or lines of a specific Page object. It is also possible 
+#### for a single screen to hold multiple pages and can be
+#### changed dynamicaly with some command specified by the 
+#### user, let's say a keystroke which will invoke the 
+#### corresponding function which goes to the previous or 
+#### the next page. The Pricli class also supports simple
+#### prints such as: Print with or without new line etc.
+
 
 class Pricli:
     def __init__(self,num_screens=1):
@@ -762,8 +810,6 @@ class Pricli:
             self.options = self.screen1_options
 
 
- 
-
     def GetWindowSize(self):
         return curses.LINES-1 , curses.COLS-1
     
@@ -910,61 +956,6 @@ class Pricli:
         self.ChangePos(current_pos)
         self.screen.refresh()
     
-    # def PrintFormatlistr(self,text_list,color_list,seperator=None): ## prints text, but each chunk of text in text_list, has color specified in color_list in corresponding index
-    #     if seperator is None:
-    #         seperator = self.TAB
-    #     current_pos = self.GetPos()
-    #     for index in range(0,len(text_list)):
-    #         if self.GetCur() > self.screen_rows - 1:
-    #             self.ChangeCur(self.GetTop())
-    #             self.ChangePos(self.longest_pos+1)
-    #         self.screen.addstr(self.GetCur(),self.GetPos(),text_list[index],curses.color_pair(color_list[index]))
-    #         # self.GetPos() += len(text_list[index])
-    #         self.ChangePos(self.GetPos() + len(text_list[index]))
-    #         self.UpdateLongestPos(len(text_list[index]))
-    #         self.screen.addstr(self.GetCur(),self.GetPos(),seperator)
-    #         self.UpdateText(text_list[index])
-    #     self.UpdateCur()
-    #     self.ChangePos(current_pos)
-    #     self.screen.refresh()
-    
-    # def Printlistr(self,text,color=curses.A_NORMAL,line=None,pos=None):
-    #     if line is not None:
-    #         self.ChangeCur(line)
-    #     if pos is not None:
-    #         self.ChangePos(pos)
-
-    #     # if self.GetCur() > self.screen_rows - 1:
-    #     #     self.ChangeCur(self.GetTop())
-    #         # self.ChangePos(self.longest_pos+1)
-    #     self.screen.addstr(1,80,"Row: "+str(self.GetCur()) +" and pos: "+str(self.GetPos()))
-    #     self.screen.refresh()
-    #     self.UpdateLongestPos(len(text))
-    #     text,lines=self.FixWidth(text)
-    #     self.screen.addstr(self.GetCur(),self.GetPos(),text,color)
-    #     self.UpdateCur(lines)
-    #     self.UpdateText(str(text))
-    #     self.screen.refresh()
-
-    # def PrintFormatlistr(self,tex,color=curses.A_NORMAL,line=None,pos=None):
-    #     if line is not None:
-    #         self.ChangeCur(line)
-    #     if pos is not None:
-    #         self.ChangePos(pos)
-    #     current_pos = self.GetPos()
-    #     for index in range(0,len(text_list)):
-    #         if self.GetCur() > self.screen_rows - 1:
-    #             self.ChangeCur(self.GetTop())
-    #             self.ChangePos(self.longest_pos+1)
-    #         self.screen.addstr(self.GetCur(),self.GetPos(),text_list[index],curses.color_pair(color_list[index]))
-    #         # self.GetPos() += len(text_list[index])
-    #         self.ChangePos(self.GetPos() + len(text_list[index]))
-    #         self.UpdateLongestPos(len(text_list[index]))
-    #         self.screen.addstr(self.GetCur(),self.GetPos(),seperator)
-    #         self.UpdateText(text_list[index])
-    #     self.UpdateCur()
-    #     self.ChangePos(current_pos)
-    #     self.screen.refresh()
     
     def CreateNewPage(self):
         # self.pricli.ClearPage()
@@ -1091,47 +1082,3 @@ def FixWidth(text):
     for line in lines:
         txt += line + "\n"
     return txt , len(lines)
-    
-
-# pricli = Pricli()
-
-# txt,linesnum = pricli.FixWidth(test_string)
-# # print(linesnum)
-
-# # pricli.screen.addstr(30,40,'Lines are: '+txt)
-# # pricli.screen.refresh()
-    
-# time.sleep(1)
-# # pricli.Printlnr(str(len(txt)))
-# for i in range(0,linesnum):
-#     w = random.randint(3,8)
-#     lines = ""
-#     for l in txt.splitlines()[i:i+w]:
-#         lines += l+'\n'
-#     time.sleep(1)
-#     pricli.AssessText(lines)
-#     splitted = lines.splitlines()
-#     # pricli.screen.addstr(30,60,'Lines are: '+str(splitted))
-#     pricli.screen.refresh()
-#     for line in splitted:
-#         pricli.Printlistr(str(line))    
-
-# time.sleep(5)
-# pricli.End()
-
-
-# pricli = Pricli()
-# topmenu(pricli)
-# pricli.PrintFormatlnr(['hostname: ','192.168.1.1'],[BLUE,RED])
-# pricli.Input()
-# pricli.ChangeWindow()
-# pricli.PrintFormatlnr(['hostname: ','192.168.1.1'],[YELLOW,GREEN])
-# pricli.Input()
-# pricli.End()
-
-
-# pricli = Pricli()
-# line = Line(pricli,test_list,colors)
-# line.PrintLine()
-# time.sleep(2)
-# pricli.End()

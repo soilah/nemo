@@ -63,11 +63,17 @@ class Nemo:
         self.port_stress = 1
         self.ports_to_scan = None
 
+        self.send_mail = True
+
         #### add these settings to the binder
+        #### Scan type Parameters
         self.AddSetting('scan_type',self.scan_type)
         self.AddSetting('scan_period',self.scan_period)
         self.AddSetting('port_stress',self.port_stress)
         self.AddSetting('ports_to_scan',self.ports_to_scan)
+
+        #### Informer parameters
+        self.AddSetting('send_mail',self.send_mail)
 
         self.mode = mode
         self.network_status = None
@@ -346,14 +352,16 @@ def SimpleScan(nemo):
             pricli.UpdatePage(['\n'])
             pricli.UpdatePage(['='*int((art_width - 10)/2)+" New hosts "+'='*int((art_width - 11)/2)],[pricli.MAGENTA])
             for host in network_status.new_hosts:
-                host.NotifyUp()
+                if nemo.send_mail:
+                    host.NotifyUp()
                 pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.RED])
 
         if len(network_status.disconnected):
             pricli.UpdatePage(['\n'])
             pricli.UpdatePage(['='*int((art_width - 20)/2)+" Disconnected hosts "+'='*int((art_width - 20)/2)],[pricli.GREEN])
             for host in network_status.disconnected:
-                host.NotifyDown()
+                if nemo.send_mail:
+                    host.NotifyDown()
                 pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.RED])
 
         pricli.RefreshPage()
@@ -427,7 +435,7 @@ def PortScan(nemo):
 def PortScanResults(host_ip,nemo,colr=None):
     host = nemo.network_status.GetHostByIp(host_ip)
     host.ports = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
-    host.CheckChanges()
+    host.CheckChanges(nemo.send_mail)
     host.SaveJson()
 
     pricli = nemo.pricli
@@ -632,7 +640,9 @@ def CreateSettings(nemo,pricli):
     scan_settings.AddParameter('port_stress',nemo.port_stress)
     settings.AddOption(scan_settings)
     settings.AddOption(Option(pricli=pricli,title='Port settings'))
-    settings.AddOption(Option(pricli=pricli,title='Informer settings'))
+    informer_settings = Option(pricli=pricli,title='Informer settings')
+    informer_settings.AddParameter('send_mail',nemo.send_mail)
+    settings.AddOption(informer_settings)
     settings.AddOption(Option(pricli=pricli,title='Theme'))
     settings.AddOption(Option(pricli=pricli,title='Exit'))
 

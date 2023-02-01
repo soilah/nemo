@@ -65,7 +65,7 @@ class Host(object):
             json_file_object.close()
             return False
     
-    def CheckChanges(self):
+    def CheckChanges(self,send_mail_flag):
         # if self.mac == self.json_mac:
         if self.json_ports is None:
             return
@@ -90,12 +90,14 @@ class Host(object):
             message = "New port opened: " + op.num +' on host '+self.ip +'('+self.hostname+')\nService: '+op.service +'\nVersion: '+op.version
             print(message)
             # SendMessage(message)
-            SendMail('OPEN PORT ALERT',message)
+            if send_mail_flag:
+                SendMail('OPEN PORT ALERT',message)
 
         for cp in closed_ports:
             message = "Port closed: " + cp.num +' on host '+self.ip +'('+self.hostname+')\nService: '+cp.service +'\nVersion: '+cp.version
             print(message)
-            SendMail('CLOSED PORT ALERT',message)
+            if send_mail_flag:
+                SendMail('CLOSED PORT ALERT',message)
             # SendMessage(message)
     
     def NotifyUp(self):
