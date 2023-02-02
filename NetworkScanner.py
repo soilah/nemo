@@ -2,6 +2,7 @@ from ProMan import ProMan
 import time
 from Host import Host, Port
 from SString import FindSubstr
+import xml.etree.ElementTree as ET
 
 ## This is an Nmap wrapper (hellooo)
 
@@ -56,9 +57,9 @@ class NmapParser:
     
     def ParsePingScan(self,result):
         self.result_text = result
-        lines = result.split('\n') ## Breaks the Nmap output into a list of its lines.
-        lines.pop(len(lines)-1)    ## But it has to remove the last element which is an empty string
-        lines.pop(0)    ## But it has to remove the last element which is an empty string
+        # lines = result.split('\n') ## Breaks the Nmap output into a list of its lines.
+        # lines.pop(len(lines)-1)    ## But it has to remove the last element which is an empty string
+        # lines.pop(0)    ## But it has to remove the last element which is an empty string
         self.network_status.disconnected = []
         self.network_status.new_hosts = []
 
@@ -84,45 +85,62 @@ class NmapParser:
 
         new_hosts = []
         host_id = 0
-        mac = '____LOCALHOST____'
-        ip = ""
-        hostname = ""
+
+        nmap_xml_root = ET.fromstring(self.result_text)
+        for host in nmap_xml_root.iter('host'):
+            mac = '____LOCALHOST____'
+            mac_type = 'Unknown'
+            ip = "x.x.x.x"
+            hostname = "Unknown Host"
+            for element in host:
+                for field in element.iter('address'):
+                    if field.attrib['addrtype'] == 'ipv4':
+                        ip = field.attrib['addr']
+                    elif field.attrib['addrtype'] == 'mac':
+                        mac = field.attrib['addr']
+                        if 'vendor' in field.attrib.keys():
+                            mac_type = field.attrib['vendor']
+                    else:
+                        print("WX KATI PHGE SKATA STA ADDRESSES (oute ipv4 oute mac)")
+                for hname in element.iter('hostname'):
+                    hostname = hname.attrib['name']
+            new_hosts.append(Host([ip,hostname],mac=mac,mac_type=mac_type))
         ### Bool variable to check if MAC addresses are shown in output ###
-        mac_shown = False
+        # mac_shown = False
 
-        for line in lines:
-            if 'MAC' in line:
-                mac_shown = True
+        # for line in lines:
+        #     if 'MAC' in line:
+        #         mac_shown = True
 
-        for line_index in range(0,len(lines),3):
-            host_found = False
-            batch = lines[line_index:line_index+3]
-            # print(batch)
-            # time.sleep(2)
-            if mac_shown:
-                if 'MAC' in batch[2]:
-                    mac = FindSubstr(batch[2],'MAC Address:',' (').strip()
-                elif 'done' in batch[2]:
-                    mac = '____LOCALHOST____'
-            if 'Nmap scan report' in batch[0]:
-                # line = lines[i]
-                ### If the 'Nmap' line contains '(': it has info about the hostname
-                line = batch[0]
-                if '(' in line: ### Parse Hostname and Ip 
-                    ip_index = line.find('(')+1
-                    host_index = line.find("for") + 4
-                    ip = line[ip_index:len(line)-1]
-                    hostname = line[host_index:ip_index-2]
-                else: ### Parse IP
-                    ip_index = line.find("for") + 4
-                    ip = line[ip_index:len(line)]
-                    hostname = "Unnamed Host"
-                host_found = True
-            if host_found:
-                found_host = Host([ip,hostname],mac=mac)
-                new_hosts.append(found_host)
-                host_found = False
-                ### Create a Host object with found Ip,Hostname
+        # for line_index in range(0,len(lines),3):
+        #     host_found = False
+        #     batch = lines[line_index:line_index+3]
+        #     # print(batch)
+        #     # time.sleep(2)
+        #     if mac_shown:
+        #         if 'MAC' in batch[2]:
+        #             mac = FindSubstr(batch[2],'MAC Address:',' (').strip()
+        #         elif 'done' in batch[2]:
+        #             mac = '____LOCALHOST____'
+        #     if 'Nmap scan report' in batch[0]:
+        #         # line = lines[i]
+        #         ### If the 'Nmap' line contains '(': it has info about the hostname
+        #         line = batch[0]
+        #         if '(' in line: ### Parse Hostname and Ip 
+        #             ip_index = line.find('(')+1
+        #             host_index = line.find("for") + 4
+        #             ip = line[ip_index:len(line)-1]
+        #             hostname = line[host_index:ip_index-2]
+        #         else: ### Parse IP
+        #             ip_index = line.find("for") + 4
+        #             ip = line[ip_index:len(line)]
+        #             hostname = "Unnamed Host"
+        #         host_found = True
+        #     if host_found:
+        #         found_host = Host([ip,hostname],mac=mac)
+        #         new_hosts.append(found_host)
+        #         host_found = False
+        #         ### Create a Host object with found Ip,Hostname
         # host_id += 1
 
         ### Categorize the Hosts found as new,current or disconnected
@@ -208,6 +226,8 @@ class NetworkScanner:
         cmd.append(self.nmap_bin)
         cmd.append('-sP') ## Ping scan, just check if hosts are up
         cmd.append(network)
+        cmd.append('-oX')
+        cmd.append('-')
 
         ## ececute the command and pass it to the parser
         self.parser.ParsePingScan(self.proman.RunProcessWait(cmd))
