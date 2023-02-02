@@ -11,13 +11,14 @@ class Port(object):
         self.version = version
 
 class Host(object):
-    def __init__(self,args,ports=None,os=None,mac=None,host_id=None):
+    def __init__(self,args,ports=None,os=None,mac=None,mac_type=None,host_id=None):
         self.host_id = host_id
         self.ip = args[0]
         self.hostname = args[1]
         self.ports = ports
         self.os = os
         self.mac = mac
+        self.mac_type = mac_type
 
         self.json_ip = None
         self.json_hostname = None
@@ -102,11 +103,11 @@ class Host(object):
     
     def NotifyUp(self):
         message = 'Host '+self.ip +' ('+self.hostname+') with mac: '+self.mac+' is UP'
-        SendMail('NEW HOST ALIVE',message)
+        # SendMail('NEW HOST ALIVE',message)
 
     def NotifyDown(self):
         message = 'Host '+self.ip +' ('+self.hostname+') with mac: '+self.mac+' is DOWN'
-        SendMail('HOST DOWN',message)
+        # SendMail('HOST DOWN',message)
 
 
 
