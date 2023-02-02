@@ -338,15 +338,20 @@ def SimpleScan(nemo):
         pricli.UpdatePage(['='*int((art_width - 6)/2)+" SCAN "+'='*int((art_width - 5)/2)],[pricli.RED])
 
         number_of_spaces = int(pricli.screen_cols/10)
+        
+        biggest_mac = 0
+        for host in network_status.hosts:
+            if len(host.mac_type) > biggest_mac:
+                biggest_mac = len(host.mac_type)
 
-        pricli.UpdatePage(['IP'+' '*number_of_spaces+'MAC'+' '*number_of_spaces+'HOSTNAME'])
+        pricli.UpdatePage(['IP'+' '*number_of_spaces+'MAC'+' '*number_of_spaces+'TYPE'+' '*biggest_mac+'HOSTNAME'])
         pricli.UpdatePage(['\n'])
 
         for host in network_status.hosts:
             ScanText = host.ip + '\t' + host.hostname
             if not pricli.AssessText(ScanText):
                 pricli.CreateNewPage()
-            pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.RED])
+            pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.mac_type, ' '*(biggest_mac-len(host.mac_type)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.CYAN,pricli.WHITE,pricli.RED])
 
         if len(network_status.new_hosts):
             pricli.UpdatePage(['\n'])
@@ -354,7 +359,7 @@ def SimpleScan(nemo):
             for host in network_status.new_hosts:
                 if nemo.send_mail:
                     host.NotifyUp()
-                pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.RED])
+                pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.mac_type,' '*(biggest_mac-len(host.mac_type)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.CYAN,pricli.WHITE,pricli.RED])
 
         if len(network_status.disconnected):
             pricli.UpdatePage(['\n'])
@@ -362,7 +367,7 @@ def SimpleScan(nemo):
             for host in network_status.disconnected:
                 if nemo.send_mail:
                     host.NotifyDown()
-                pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.RED])
+                pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.mac_type,' '*(biggest_mac-len(host.mac_type)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.CYAN,pricli.WHITE,pricli.RED])
 
         pricli.RefreshPage()
         counter = int(nemo.scan_period)
