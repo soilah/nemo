@@ -57,31 +57,9 @@ class NmapParser:
     
     def ParsePingScan(self,result):
         self.result_text = result
-        # lines = result.split('\n') ## Breaks the Nmap output into a list of its lines.
-        # lines.pop(len(lines)-1)    ## But it has to remove the last element which is an empty string
-        # lines.pop(0)    ## But it has to remove the last element which is an empty string
+
         self.network_status.disconnected = []
         self.network_status.new_hosts = []
-
-        # self.network_status.hosts = []
-        # if "MAC" in lines[4]:
-        ### Nmap prints a number of lines dedicated to each host.
-        ### If run as root, nmap will also print the mac address of each host
-        ### and so each host will consume three (3) lines. The step variable
-        ### is assigned accordingly so to jump at the corresponding line of each host.
-        ### !! MAY NOT USE THIS TECHNIQUE !!
-        # for line in lines:
-        #     if "MAC" in line:
-        #         step = 3
-        #         break
-        # else:
-        #     step = 2 
-
-        ### Nmap prints a number of lines dedicated to each host.
-        ### Nmap output is of the following style:
-        ### Nmap scan report for hostname (xxx.xxx.xxx.xxx), if a hostname is found for that host, or
-        ### Nmap scan report for xxx.xxx.xxx.xxx, if not
-        ### Generaly, If the line starts with 'Nmap', it contains info about the IP and the hostname (if any)
 
         new_hosts = []
         host_id = 0
@@ -105,43 +83,6 @@ class NmapParser:
                 for hname in element.iter('hostname'):
                     hostname = hname.attrib['name']
             new_hosts.append(Host([ip,hostname],mac=mac,mac_type=mac_type))
-        ### Bool variable to check if MAC addresses are shown in output ###
-        # mac_shown = False
-
-        # for line in lines:
-        #     if 'MAC' in line:
-        #         mac_shown = True
-
-        # for line_index in range(0,len(lines),3):
-        #     host_found = False
-        #     batch = lines[line_index:line_index+3]
-        #     # print(batch)
-        #     # time.sleep(2)
-        #     if mac_shown:
-        #         if 'MAC' in batch[2]:
-        #             mac = FindSubstr(batch[2],'MAC Address:',' (').strip()
-        #         elif 'done' in batch[2]:
-        #             mac = '____LOCALHOST____'
-        #     if 'Nmap scan report' in batch[0]:
-        #         # line = lines[i]
-        #         ### If the 'Nmap' line contains '(': it has info about the hostname
-        #         line = batch[0]
-        #         if '(' in line: ### Parse Hostname and Ip 
-        #             ip_index = line.find('(')+1
-        #             host_index = line.find("for") + 4
-        #             ip = line[ip_index:len(line)-1]
-        #             hostname = line[host_index:ip_index-2]
-        #         else: ### Parse IP
-        #             ip_index = line.find("for") + 4
-        #             ip = line[ip_index:len(line)]
-        #             hostname = "Unnamed Host"
-        #         host_found = True
-        #     if host_found:
-        #         found_host = Host([ip,hostname],mac=mac)
-        #         new_hosts.append(found_host)
-        #         host_found = False
-        #         ### Create a Host object with found Ip,Hostname
-        # host_id += 1
 
         ### Categorize the Hosts found as new,current or disconnected
         new_hosts, same_hosts, disconnected = RefreshHosts(new_hosts,self.network_status.hosts)
@@ -149,57 +90,152 @@ class NmapParser:
         self.network_status.disconnected = disconnected
         self.network_status.hosts = curr_hosts
         self.network_status.new_hosts = new_hosts
-        # self.network_status.Update()
     
     def ParseServiceScan(self,res,scan_type=1):
+        self.result_text = res
         
         if self.network_status.stopped.is_set():
             # stopped = True
             return
 
-        lines = res.split('\n')
-        reached_PORT = False
-        ports = []
-        for line in lines:
-            if reached_PORT:
-                if 'tcp' in line:
-                    data = line.split(' ')
-                    data = [el for el in data if el != '']
-                    if 'open' not in data[1]:
-                        continue
-                    port = data[0]
-                    service = data[2]
-                    version = ''
-                    if str(scan_type) == str(2):
-                        for i in range(3,len(data)):
-                            version += data[i]
-                            version += ' '
-                    ports.append(Port(port,None,service,version))
 
-            else:
-                if 'PORT' in line:
-                    reached_PORT = True
-                continue
+        ports = []
+
+        nmap_xml_root = ET.fromstring(self.result_text)
+        
+        for port_info in nmap_xml_root.iter('port'):
+            port = ''
+            service = ''
+            version = ''
+            port = port_info.attrib['portid']
+            version_prefix = ' '
+            attributes = ['product','extrainfo','ostype']
+            for field in port_info.iter('service'):
+                service = field.attrib['name']
+                if 'version' in field.attrib.keys():
+                    version = field.attrib['version']
+                    version_prefix = ' - '
+
+                for attr in attributes:
+                    if attr in field.attrib.keys():
+                        version += version_prefix + field.attrib[attr]
+
+            ports.append(Port(port,None,service,version))
+
         return ports
     
     def ParseOsScan(self,res):
+        self.result_text = res
         if self.network_status.stopped.is_set():
             return
         os_info = []
         
-        if 'Running' in res:
-            os_info.append(FindSubstr(res,'MAC Address:'))
-            os_info.append(FindSubstr(res,'Device type:'))
-            os_info.append(FindSubstr(res,'Running:'))
-            os_info.append(FindSubstr(res,'OS CPE:'))
-            os_info.append(FindSubstr(res,'OS details:'))
+        nmap_xml_root = ET.fromstring(self.result_text)
+        
+        mac = ''
+        mac_type = ''
+        for mac_info in nmap_xml_root.iter('address'):
+            if mac_info.attrib['addrtype'] == 'mac':
+                mac = mac_info.attrib['addr']
+                if 'vendor' in mac_info.attrib.keys():
+                    mac_type = mac_info.attrib['vendor']
+                os_info.append(mac)
+                # os_info.append(mac_type)
 
-        elif 'No exact' in res or 'Too many' in res in res:
-            os_info.append(FindSubstr(res,'MAC Address'))
+        osfamily = ''
+        osgen = ''
+        dev_type = ''
+        extra_vendor = ''
+        cpe = ''
+        found_keywords = []
+        for osclass in nmap_xml_root.iter('osclass'):
+            if 'type' in osclass.attrib.keys():
+                dev_type = osclass.attrib['type']
+            if 'vendor' in osclass.attrib.keys():
+                # if extra_vendor == '':
+                #     extra_vendor = osclass.attrib['vendor']
+                # else:
+                #     extra_vendor = '|' + osclass.attrib['vendor']
+                extra_vendor = osclass.attrib['vendor']
+                if extra_vendor not in found_keywords:
+                    found_keywords.append(extra_vendor)
+            if 'osfamily' in osclass.attrib.keys():
+                # if osfamily == '':
+                #     osfamily = osclass.attrib['osfamily']
+                # else:
+                #     osfamily += '|' + osclass.attrib['osfamily']
+                osfamily = osclass.attrib['osfamily']
+                if osfamily not in found_keywords:
+                    found_keywords.append(osfamily)
 
-        elif 'unreliable' in res:
+            if 'osgen' in osclass.attrib.keys():
+                # osgen += osclass.attrib['osgen'] + '|'
+                osgen = osclass.attrib['osgen']
+                if osgen not in found_keywords:
+                    found_keywords.append(osgen)
+
+            for cpeinfo in osclass.iter('cpe'):
+                if 'cpe' in cpeinfo.attrib.keys():
+                    cpe += cpeinfo.attrib['cpe']
+        
+        
+
+        
+        if osgen != '':
+            osgen = osgen[0:len(osgen) - 1]
+        
+        # running = osfamily + ' ' + osgen
+        # if extra_vendor != '' and extra_vendor != osfamily:
+        #     running +=  ' ' +extra_vendor
+        running = ''
+        for keywords in found_keywords:
+            running += keywords + '|'
+
+        if mac_type.strip() != '' or dev_type.strip() != '': 
+            os_info.append(mac_type+' '+dev_type)
+        if running.strip() != '':
+            os_info.append(running)
+        if cpe.strip() != '':
+            os_info.append(cpe)
+        if cpe.strip() == '' and len(os_info) > 1:
+            os_info.append('No cpe info')
+
+        os_details = ''
+        os_matches_found = 0
+        for osinfo in nmap_xml_root.iter('osmatch'):
+            os_details += osinfo.attrib['name'] + '|'
+            os_matches_found += 1
+            if os_matches_found > 2:
+                os_details += ' ....'
+                break
+
+        if os_details.strip() != '': 
+            os_info.append(os_details[0:len(os_details)-1])
+
+        # if 'Running' in res:
+        #     mac_info.append(FindSubstr(res,'MAC Address:'))
+        #     mac_info.append(FindSubstr(res,'Device type:'))
+        #     mac_info.append(FindSubstr(res,'Running:'))
+        #     mac_info.append(FindSubstr(res,'OS CPE:'))
+        #     mac_info.append(FindSubstr(res,'OS details:'))
+
+        # elif 'No exact' in res or 'Too many' in res in res:
+        #     mac_info.append(FindSubstr(res,'MAC Address'))
+
+        # elif 'unreliable' in res:
+        #     return None
+        print(os_info)
+        time.sleep(5)
+
+        #### check if all values are empty. This probably means that host is offline or in another network ####
+        empty = True
+        for el in os_info:
+            if el.strip() != '':
+                empty = False
+                break
+        if empty:
             return None
-
+        
         return os_info
 
 class NetworkScanner:
@@ -242,6 +278,8 @@ class NetworkScanner:
         for opt in self.nmap_options:
             cmd.append(opt)
         cmd.append(ip)
+        cmd.append('-oX')
+        cmd.append('-')
         
 
         return self.parser.ParseServiceScan(self.proman.RunProcessWait(cmd),scan_type=scan_type)
@@ -253,6 +291,8 @@ class NetworkScanner:
         cmd.append('-O')
         cmd.append('-Pn')
         cmd.append(ip)
+        cmd.append('-oX')
+        cmd.append('-')
 
         # return self.proman.RunProcessWait(cmd)
         return self.parser.ParseOsScan(self.proman.RunProcessWait(cmd))
