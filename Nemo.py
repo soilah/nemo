@@ -458,7 +458,7 @@ def PortScanResults(host_ip,nemo,colr=None):
         lines.append(['No scanned ports open'])
         colors.append([pricli.RED])
     for port in host.ports:
-        lines.append(['\t'+port.num+'/tcp'])
+        lines.append([port.num+'/tcp'])
         colors.append([pricli.YELLOW])
         if nemo.scan_type == 1:
             lines.append(['Service: ',port.service])
