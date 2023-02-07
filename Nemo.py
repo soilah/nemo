@@ -458,7 +458,7 @@ def PortScanResults(host_ip,nemo,colr=None):
         lines.append(['No scanned ports open'])
         colors.append([pricli.RED])
     for port in host.ports:
-        lines.append([port.num])
+        lines.append(['\t'+port.num+'/tcp'])
         colors.append([pricli.YELLOW])
         if nemo.scan_type == 1:
             lines.append(['Service: ',port.service])
@@ -472,6 +472,15 @@ def PortScanResults(host_ip,nemo,colr=None):
 
 def OsDetectionResults(host_ip,nemo):
     pricli = nemo.pricli 
+
+    #### check once again if host is up and try until it is or until 3 tries have been passed ####
+    tries = 3
+    while tries > 0:
+        if not nemo.network_scanner.IsHostUp(host_ip):
+            tries -= 1
+        else:
+            break
+
     os = nemo.network_scanner.OsScan(host_ip)
     lines = []
     colors = []
@@ -481,11 +490,13 @@ def OsDetectionResults(host_ip,nemo):
         lines.append(['Could not determine OS.', 'Maybe that host is on another network?'])
         colors.append([pricli.RED,pricli.YELLOW])
     else:
-
         lines.append(['Mac Address: ',os[0]])
         colors.append([pricli.normal_color,pricli.YELLOW])
 
         if len(os) > 1:
+            for indx in range(1,len(os)):
+                if len(os[indx]) >= pricli.screen_cols:
+                    os[indx] = os[indx][0:pricli.screen_cols-50] 
 
             lines.append(['Device Type: ',os[1]])
             colors.append([pricli.normal_color,pricli.YELLOW])
