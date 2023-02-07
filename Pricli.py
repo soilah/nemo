@@ -363,8 +363,8 @@ class ControlPanel:
                 #     self.pricli.CreateNewPage()
                 #     self.Draw(drawInfowindow=False)
                     # self.current_page += 1
-                w.DrawWindow(self.pricli)
-                self.pricli.ChangePos(1)
+                if w.DrawWindow(self.pricli):
+                    self.pricli.ChangePos(1)
 
     def AddControlKey(self,key,value):
         self.control_keys[key] = value
@@ -840,6 +840,11 @@ class Pricli:
         # if self.GetCur() > self.screen_rows - 1:
         #     self.ChangeCur(self.GetTop())
         # self.UpdateLongestPos(len(text))
+
+        #### if text does not fit on the screen, just remove the part that doesn't fit ####
+        # if len(text) > self.screen_cols:
+        #     text = text[0:self.screen_cols-2]
+
         self.screen.addstr(self.GetCur(),self.GetPos(),text,curses.color_pair(color))
         self.UpdatePos(len(text))
         if '\t' in text:
