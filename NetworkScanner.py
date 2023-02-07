@@ -134,8 +134,10 @@ class NmapParser:
         
         mac = ''
         mac_type = ''
+        mac_not_found = True
         for mac_info in nmap_xml_root.iter('address'):
-            if mac_info.attrib['addrtype'] == 'mac':
+            if mac_info.attrib['addrtype'] == 'mac' and mac_not_found:
+                mac_not_found = False
                 mac = mac_info.attrib['addr']
                 if 'vendor' in mac_info.attrib.keys():
                     mac_type = mac_info.attrib['vendor']
