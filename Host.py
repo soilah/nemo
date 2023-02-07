@@ -2,6 +2,7 @@ import json
 import os
 # from TelegramBot import SendMessage
 from SendMail import SendMail
+import time
 
 class Port(object):
     def __init__(self,port_num,info,service=None,version=None):
@@ -89,14 +90,14 @@ class Host(object):
 
         for op in opened_ports:
             message = "New port opened: " + op.num +' on host '+self.ip +'('+self.hostname+')\nService: '+op.service +'\nVersion: '+op.version
-            print(message)
+            # print(message)
             # SendMessage(message)
             if send_mail_flag:
                 SendMail('OPEN PORT ALERT',message)
 
         for cp in closed_ports:
             message = "Port closed: " + cp.num +' on host '+self.ip +'('+self.hostname+')\nService: '+cp.service +'\nVersion: '+cp.version
-            print(message)
+            # print(message)
             if send_mail_flag:
                 SendMail('CLOSED PORT ALERT',message)
             # SendMessage(message)
