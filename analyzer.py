@@ -24,7 +24,10 @@ def Analyzer(nemo):
 
         hosts = []
         for host in network_status.hosts:
-            hosts.append(host.ip + '('+host.hostname+')')
+            if host.hostname != '':
+                hosts.append(host.ip + '('+host.hostname+')')
+            else:
+                hosts.append(host.ip)
         hosts.append("Exit")
 
         # pricli.lock.acquire()
@@ -44,8 +47,16 @@ def Analyzer(nemo):
 
                 #### Port-Service Scanning with option for version scan ####
                 if action == 1 or action == 2:
-                    title = ['Port Scan for:',host_ip,' (',hostname,')']
-                    title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
+                    title = []
+                    title_colors = []
+
+                    if hostname != '':
+                        title = ['OS Info for: ',host_ip,' (',hostname,')']
+                        title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
+                    else:
+                        title = ['OS Info for: ',host_ip]
+                        title_colors = [pricli.normal_color,pricli.BLUE]
+
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
                     nemo.SetScanType(int(action))
@@ -58,8 +69,14 @@ def Analyzer(nemo):
                 
                 #### OS detection ####
                 elif action == 3:
-                    title = ['OS Info for: ',host_ip,' (',hostname,')']
-                    title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
+                    title = []
+                    title_colors = []
+                    if hostname != '':
+                        title = ['OS Info for: ',host_ip,' (',hostname,')']
+                        title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
+                    else:
+                        title = ['OS Info for: ',host_ip]
+                        title_colors = [pricli.normal_color,pricli.BLUE]
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
                     lines,colors = Nemo.OsDetectionResults(host_ip,nemo)
@@ -70,8 +87,14 @@ def Analyzer(nemo):
                 #### BOTH OS detection and Port Scan ####
                 elif action == 4:
                     nemo.SetScanType(2)
-                    title = ['Services and OS info for: ',host_ip,' (',hostname,')']
-                    title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
+                    title = []
+                    title_colors = []
+                    if hostname != '':
+                        title = ['Services and OS info for: ',host_ip,' (',hostname,')']
+                        title_colors = [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
+                    else:
+                        title = ['Services and OS info for: ',host_ip]
+                        title_colors = [pricli.normal_color,pricli.BLUE]
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
                     os_lines, os_colors = Nemo.OsDetectionResults(host_ip,nemo)
