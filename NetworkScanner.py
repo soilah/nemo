@@ -69,7 +69,7 @@ class NmapParser:
             mac = '____LOCALHOST____'
             mac_type = 'Unknown'
             ip = "x.x.x.x"
-            hostname = "Unknown Host"
+            hostname = ''
             for element in host:
                 for field in element.iter('address'):
                     if field.attrib['addrtype'] == 'ipv4':
@@ -82,6 +82,8 @@ class NmapParser:
                         print("WX KATI PHGE SKATA STA ADDRESSES (oute ipv4 oute mac)")
                 for hname in element.iter('hostname'):
                     hostname = hname.attrib['name']
+                    if hostname == ip:
+                        hostname = ''
             new_hosts.append(Host([ip,hostname],mac=mac,mac_type=mac_type))
 
         ### Categorize the Hosts found as new,current or disconnected
@@ -148,7 +150,7 @@ class NmapParser:
         osgen = ''
         dev_type = ''
         extra_vendor = ''
-        cpe = ''
+        # cpe = ''
         found_keywords = []
         for osclass in nmap_xml_root.iter('osclass'):
             if 'type' in osclass.attrib.keys():
@@ -176,9 +178,14 @@ class NmapParser:
                 if osgen not in found_keywords:
                     found_keywords.append(osgen)
 
-            for cpeinfo in osclass.iter('cpe'):
-                if 'cpe' in cpeinfo.attrib.keys():
-                    cpe += cpeinfo.attrib['cpe']
+            # found_cpes = []
+            # cpes_num = 0
+            # for cpeinfo in osclass.iter('cpe'):
+            #     if cpeinfo.text not in found_cpes:
+            #         cpe += cpeinfo.text + '|'
+            #         cpes_num += 1
+            #         if cpes_num > 2:
+            #             break
         
         
 
@@ -197,10 +204,10 @@ class NmapParser:
             os_info.append(mac_type+' '+dev_type)
         if running.strip() != '':
             os_info.append(running)
-        if cpe.strip() != '':
-            os_info.append(cpe)
-        if cpe.strip() == '' and len(os_info) > 1:
-            os_info.append('No cpe info')
+        # if cpe.strip() != '':
+        #     os_info.append(cpe)
+        # if cpe.strip() == '' and len(os_info) > 1:
+        #     os_info.append('No cpe info')
 
         os_details = ''
         os_matches_found = 0
@@ -226,8 +233,8 @@ class NmapParser:
 
         # elif 'unreliable' in res:
         #     return None
-        print(os_info)
-        time.sleep(5)
+        # print(os_info)
+        # time.sleep(5)
 
         #### check if all values are empty. This probably means that host is offline or in another network ####
         empty = True
