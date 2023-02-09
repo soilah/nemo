@@ -493,19 +493,22 @@ def OsDetectionResults(host_ip,nemo):
         lines.append(['Mac Address: ',os[0]])
         colors.append([pricli.normal_color,pricli.YELLOW])
 
+        titles = ['Device type','Running','OS Details']
         if len(os) > 1:
             for indx in range(1,len(os)):
                 if len(os[indx]) >= pricli.screen_cols:
                     os[indx] = os[indx][0:pricli.screen_cols-50] 
+                lines.append([titles[indx-1]+": ",os[indx]])
+                colors.append([pricli.normal_color,pricli.YELLOW])
 
-            lines.append(['Device Type: ',os[1]])
-            colors.append([pricli.normal_color,pricli.YELLOW])
-            lines.append(['Running: ',os[2]])
-            colors.append([pricli.normal_color,pricli.YELLOW])
-            lines.append(['OS CPE: ',os[3]])
-            colors.append([pricli.normal_color,pricli.YELLOW])
-            lines.append(['OS Details: ',os[4]])
-            colors.append([pricli.normal_color,pricli.YELLOW])
+            # lines.append(['Device Type: ',os[1]])
+            # colors.append([pricli.normal_color,pricli.YELLOW])
+            # lines.append(['Running: ',os[2]])
+            # colors.append([pricli.normal_color,pricli.YELLOW])
+            # lines.append(['OS CPE: ',os[3]])
+            # colors.append([pricli.normal_color,pricli.YELLOW])
+            # lines.append(['OS Details: ',os[3]])
+            # colors.append([pricli.normal_color,pricli.YELLOW])
         else:
             lines.append(['OS: ','Unknown'])
             colors.append([pricli.normal_color,pricli.YELLOW])
