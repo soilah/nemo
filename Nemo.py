@@ -436,10 +436,14 @@ def PortScan(nemo):
         if fancy:
             pricli.ClearPages()
 
-
-def PortScanResults(host_ip,nemo,colr=None):
+#### proto=1 for tcp and 2 for udp ####
+def PortScanResults(host_ip,nemo,proto=1,colr=None):
     host = nemo.network_status.GetHostByIp(host_ip)
-    host.ports = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
+    if proto == 1:
+        host.ports = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
+    elif proto == 2:
+        host.ports = nemo.network_scanner.UdpScan(host_ip,scan_type=nemo.scan_type)
+        
     host.CheckChanges(nemo.send_mail)
     host.SaveJson()
 
