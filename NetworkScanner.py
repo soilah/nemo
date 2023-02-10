@@ -246,6 +246,17 @@ class NmapParser:
             return None
         
         return os_info
+    
+    # def ParseUdpScan(self,res):
+    #     self.result_text = res
+
+    #     if self.network_status.stopped.is_set():
+    #         return
+
+    #     udp_info = []
+    #     nmap_xml_root = ET.fromstring(self.result_text)
+
+
 
 class NetworkScanner:
     def __init__(self,network_status,bin='nmap'):
@@ -305,3 +316,15 @@ class NetworkScanner:
 
         # return self.proman.RunProcessWait(cmd)
         return self.parser.ParseOsScan(self.proman.RunProcessWait(cmd))
+    
+    def UdpScan(self,ip,scan_type=1):
+        
+        cmd = []
+        cmd.append(self.nmap_bin)
+        cmd.append('-sU')
+        cmd.append('-Pn')
+        cmd.append(ip)
+        cmd.append('-oX')
+        cmd.append('-')
+
+        return self.parser.ParseServiceScan(self.proman.RunProcessWait(cmd),scan_type=scan_type)
