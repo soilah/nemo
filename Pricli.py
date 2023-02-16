@@ -88,6 +88,9 @@ class InfoWindow:
         self.colors = colors
         self.lines_to_draw = []
         self.colors_to_draw = []
+
+        self.top_line_index = 0
+        self.last_line_index = len(self.lines)
         if border_color is None:
             self.border_color = pricli.GREEN
         else:
@@ -138,7 +141,7 @@ class InfoWindow:
         self.lines_to_draw.append(['*'*(self.max_width+2)])
         self.colors_to_draw.append([self.border_color])
 
-        for line_index  in range(0,len(self.lines)):
+        for line_index  in range(self.top_line_index,self.last_line_index):
             line = self.lines[line_index]
             col = self.colors[line_index+1]
             line.insert(0,'*')
@@ -186,6 +189,10 @@ class InfoWindow:
             pricli.ChangeCur(top_row)
             return True
         return False
+    
+    def UpdateWindowLines(self,pricli):
+        for index in range(2,len())
+        self.lines_to_draw = self.lines
 
 
 #### This is an interface that may come handy when someone
@@ -218,11 +225,14 @@ class ControlPanel:
 
         self.pricli = pricli
         self.total_lines = self.pricli.GetTop()
-        self.current_page = 1
+        self.current_page = 0
         self.lines_per_page = [0]
         self.control_keys['q'] = 'Quit'
         self.control_keys['k'] = 'Previous Page'
         self.control_keys['l'] = 'Next Page'
+        self.control_keys['n'] = 'Toggle Info Window'
+
+        self.current_info_window = 1
 
     def PrintBanner(self):
         # self.pricli.Clear()
@@ -259,8 +269,9 @@ class ControlPanel:
     def InsertWindow(self,window):
         # self.total_lines += len(window.lines_to_draw)
         if self.top_pos + self.lines_per_page[self.current_page-1] + len(window.lines_to_draw) > self.pricli.screen_rows:
-            self.lines_per_page.append(len(window.lines_to_draw))
-            self.current_page += 1
+            # self.lines_per_page.append(len(window.lines_to_draw))
+            # self.current_page += 1
+
         else:
             self.lines_per_page[self.current_page-1] += len(window.lines_to_draw)
         self.info_windows.append(window)
@@ -333,6 +344,7 @@ class ControlPanel:
     def DrawInfoWindows(self,horizontal=True):
         max_width = 0
         max_lines = 0
+        # self.pricli.ClearPage()
         if horizontal:
             for w in self.info_windows:
                 if w.max_width < max_width:
@@ -368,6 +380,18 @@ class ControlPanel:
 
     def AddControlKey(self,key,value):
         self.control_keys[key] = value
+    
+    def ToggleWindow(self):
+        # print(self.info_windows[self.current_info_window].colors_to_draw)
+        # time.sleep(5)
+        border_color = self.info_windows[self.current_info_window].border_color
+        self.info_windows[self.current_info_window].colors_to_draw[1] = [border_color, self.pricli.CYAN, border_color]
+        if self.current_info_window == len(self.info_windows) - 1:
+            self.current_info_window = 0
+        else:
+            self.current_info_window += 1
+        self.info_windows[self.current_info_window].colors_to_draw[1] = [border_color,self.pricli.RED,border_color]
+        self.Draw()
 
 #### This class represents a list that has options to be changed
 #### inside a settings menu. If the settings menu has options

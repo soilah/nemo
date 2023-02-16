@@ -7,6 +7,7 @@ def Analyzer(nemo):
     network_status = nemo.network_status
     network_scanner = nemo.network_scanner
     stopped = False
+    control_panel = None
     while True:
         if stopped:
             break
@@ -125,9 +126,14 @@ def Analyzer(nemo):
                     host_selected = False
                     break
                 
-                input = pricli.Input()
-                while input != ord('q'):
+                while(1):
                     input = pricli.Input()
+                    if input == ord('n'):
+                        control_panel.ToggleWindow()
+
+                    if input == ord('q'):
+                        break
+
                 pricli.ClearPages()
 
 
