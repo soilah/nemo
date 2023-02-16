@@ -190,9 +190,9 @@ class InfoWindow:
             return True
         return False
     
-    def UpdateWindowLines(self,pricli):
-        for index in range(2,len())
-        self.lines_to_draw = self.lines
+    # def UpdateWindowLines(self,pricli):
+    #     for index in range(2,len())
+    #     self.lines_to_draw = self.lines
 
 
 #### This is an interface that may come handy when someone
@@ -269,9 +269,8 @@ class ControlPanel:
     def InsertWindow(self,window):
         # self.total_lines += len(window.lines_to_draw)
         if self.top_pos + self.lines_per_page[self.current_page-1] + len(window.lines_to_draw) > self.pricli.screen_rows:
-            # self.lines_per_page.append(len(window.lines_to_draw))
-            # self.current_page += 1
-
+            self.lines_per_page.append(len(window.lines_to_draw))
+            self.current_page += 1
         else:
             self.lines_per_page[self.current_page-1] += len(window.lines_to_draw)
         self.info_windows.append(window)
