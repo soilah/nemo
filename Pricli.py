@@ -141,7 +141,9 @@ class InfoWindow:
         self.lines_to_draw.append(['*'*(self.max_width+2)])
         self.colors_to_draw.append([self.border_color])
 
-        for line_index  in range(self.top_line_index,self.last_line_index):
+        # if 
+
+        for line_index  in range(0,self.last_line_index):
             line = self.lines[line_index]
             col = self.colors[line_index+1]
             line.insert(0,'*')
@@ -190,9 +192,25 @@ class InfoWindow:
             return True
         return False
     
-    # def UpdateWindowLines(self,pricli):
-    #     for index in range(2,len())
-    #     self.lines_to_draw = self.lines
+    def ScrollUp(self):
+        if self.top_line_index > 0:
+            self.top_line_index -= 1
+            self.last_line_index -= 1
+            self.UpdateWindowLines()
+            return True
+        return False
+
+    def ScrollDown(self):
+        if self.last_line_index < len(self.lines):
+            self.top_line_index += 1 
+            self.last_line_index += 1
+            self.UpdateWindowLines()
+            return True
+        return False
+
+    def UpdateWindowLines(self):
+        self.lines_to_draw[3:-1] = self.lines[self.top_line_index:self.last_line_index]
+        self.colors_to_draw[3:-1] = self.colors[self.top_line_index+1:self.last_line_index+1]
 
 
 #### This is an interface that may come handy when someone
@@ -231,6 +249,9 @@ class ControlPanel:
         self.control_keys['k'] = 'Previous Page'
         self.control_keys['l'] = 'Next Page'
         self.control_keys['n'] = 'Toggle Info Window'
+        self.control_keys['w'] = 'Scroll Up'
+        self.control_keys['s'] = 'Scroll Down'
+        self.control_keys['r'] = 'Restart Analysis'
 
         self.current_info_window = 1
 
@@ -239,21 +260,27 @@ class ControlPanel:
         # self.pricli.Init()
         # self.pricli.Refuresh()
         self.pricli.ClearPages()
-        text = """
-░██████╗░█████╗░░█████╗░███╗░░██╗██╗░░░░░░█████╗░██████╗░
-██╔════╝██╔══██╗██╔══██╗████╗░██║██║░░░░░██╔══██╗██╔══██╗
-╚█████╗░██║░░╚═╝███████║██╔██╗██║██║░░░░░███████║██████╦╝
-░╚═══██╗██║░░██╗██╔══██║██║╚████║██║░░░░░██╔══██║██╔══██╗
-██████╔╝╚█████╔╝██║░░██║██║░╚███║███████╗██║░░██║██████╦╝
-╚═════╝░░╚════╝░╚═╝░░╚═╝╚═╝░░╚══╝╚══════╝╚═╝░░╚═╝╚═════╝░ """
+        text = """    █████╗ ███╗   ██╗ █████╗ ██╗  ██╗   ██╗███████╗███████╗██████╗ 
+                    ██╔══██╗████╗  ██║██╔══██╗██║  ╚██╗ ██╔╝╚══███╔╝██╔════╝██╔══██╗
+                    ███████║██╔██╗ ██║███████║██║   ╚████╔╝   ███╔╝ █████╗  ██████╔╝
+                    ██╔══██║██║╚██╗██║██╔══██║██║    ╚██╔╝   ███╔╝  ██╔══╝  ██╔══██╗
+                    ██║  ██║██║ ╚████║██║  ██║███████╗██║   ███████╗███████╗██║  ██║
+                    ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝╚═╝   ╚══════╝╚══════╝╚═╝  ╚═╝
+                                                                
 
 
-        b1 ='░██████╗░█████╗░░█████╗░███╗░░██╗██╗░░░░░░█████╗░██████╗░'
-        b2 ='██╔════╝██╔══██╗██╔══██╗████╗░██║██║░░░░░██╔══██╗██╔══██╗'
-        b3 ='╚█████╗░██║░░╚═╝███████║██╔██╗██║██║░░░░░███████║██████╦╝'
-        b4 ='░╚═══██╗██║░░██╗██╔══██║██║╚████║██║░░░░░██╔══██║██╔══██╗'
-        b5 ='██████╔╝╚█████╔╝██║░░██║██║░╚███║███████╗██║░░██║██████╦╝'
-        b6 ='╚═════╝░░╚════╝░╚═╝░░╚═╝╚═╝░░╚══╝╚══════╝╚═╝░░╚═╝╚═════╝░'
+                                                                   
+                                                                   
+
+"""
+
+
+        b1 =' █████╗ ███╗   ██╗ █████╗ ██╗  ██╗   ██╗███████╗███████╗██████╗ '
+        b2 ='██╔══██╗████╗  ██║██╔══██╗██║  ╚██╗ ██╔╝╚══███╔╝██╔════╝██╔══██╗'
+        b3 ='███████║██╔██╗ ██║███████║██║   ╚████╔╝   ███╔╝ █████╗  ██████╔╝'
+        b4 ='██╔══██║██║╚██╗██║██╔══██║██║    ╚██╔╝   ███╔╝  ██╔══╝  ██╔══██╗'
+        b5 ='██║  ██║██║ ╚████║██║  ██║███████╗██║   ███████╗███████╗██║  ██║'
+        b6 ='╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝╚═╝   ╚══════╝╚══════╝╚═╝  ╚═╝'
         self.pricli.UpdatePage([b1]) # Title for this menu
         self.pricli.UpdatePage([b2]) # Title for this menu
         self.pricli.UpdatePage([b3]) # Title for this menu
@@ -269,8 +296,15 @@ class ControlPanel:
     def InsertWindow(self,window):
         # self.total_lines += len(window.lines_to_draw)
         if self.top_pos + self.lines_per_page[self.current_page-1] + len(window.lines_to_draw) > self.pricli.screen_rows:
-            self.lines_per_page.append(len(window.lines_to_draw))
-            self.current_page += 1
+            # self.lines_per_page.append(len(window.lines_to_draw))
+            # self.current_page += 1
+            print("NAI... THA GAMITHEI! ")
+            print(window.lines)
+            print(window.colors)
+            time.sleep(5)
+            lines_that_fit = self.pricli.screen_rows - self.top_pos
+            window.last_line_index = lines_that_fit
+            window.UpdateWindowLines()
         else:
             self.lines_per_page[self.current_page-1] += len(window.lines_to_draw)
         self.info_windows.append(window)
@@ -284,7 +318,7 @@ class ControlPanel:
     def AddInfoText(self,text):
         self.info_text = text
     
-    def SetTopPos(self,pos):
+    def SetopPos(self,pos):
         self.top_pos = pos
     
     def UpdateTopPos(self,pos):
@@ -300,7 +334,7 @@ class ControlPanel:
         line = '|'
         self.control_keys_lines = []
         for key in self.control_keys.keys():
-            key_pair_string = key+": "+self.control_keys[key]+" "
+            key_pair_string = self.control_keys[key]+": " + key +" , "
             if len(key_pair_string) + len(line) > self.pricli.screen_cols:
                 self.control_keys_lines.append(line)
                 line = ''

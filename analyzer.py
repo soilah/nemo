@@ -1,6 +1,7 @@
 # from Nemo import OsDetectionResults, PortScanResults
 import Nemo
 from Pricli import ControlPanel, InfoWindow
+import time
 
 def Analyzer(nemo):
     pricli = nemo.pricli
@@ -40,11 +41,14 @@ def Analyzer(nemo):
                 # lock.release()
                 return
             host_selected = True
+            restart_selected = False
+            action = None
             while host_selected:
                 host_ip = network_status.hosts[host_index-1].ip
                 hostname = network_status.hosts[host_index-1].hostname
-                actions = ['Service Port Scan','Service Version Port Scan','OS Detection','OS Detection/Service Scan','UDP Scan','Exit']
-                action = pricli.menu.Menu('Select an action on host: '+host_ip,actions)
+                if not restart_selected:
+                    actions = ['Service Port Scan','Service Version Port Scan','OS Detection','OS Detection/Service Scan','UDP Scan','Exit']
+                    action = pricli.menu.Menu('Select an action on host: '+host_ip,actions)
 
                 #### Port-Service Scanning with option for version scan ####
                 if action == 1 or action == 2:
@@ -126,12 +130,24 @@ def Analyzer(nemo):
                     host_selected = False
                     break
                 
+
+                #### This is where i read for your key strokes ####
                 while(1):
                     input = pricli.Input()
                     if input == ord('n'):
                         control_panel.ToggleWindow()
+                    if input == ord('w'):
+                        if(control_panel.info_windows[control_panel.current_info_window].ScrollUp()):
+                            control_panel.Draw()
+                    if input == ord('s'):
+                        if(control_panel.info_windows[control_panel.current_info_window].ScrollDown()):
+                            control_panel.Draw()
+                    if input == ord('r'):
+                        restart_selected = True
+                        break
 
                     if input == ord('q'):
+                        restart_selected = False
                         break
 
                 pricli.ClearPages()

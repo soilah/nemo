@@ -462,8 +462,8 @@ def PortScanResults(host_ip,nemo,proto=1,colr=None):
     else:
         colors = colr
 
-    lines.append(['Ports: '])
-    colors.append([pricli.GREEN])
+    # lines.append(['Ports: '])
+    # colors.append([pricli.GREEN])
     if len(host.ports) < 1:
         lines.append(['No scanned ports open'])
         colors.append([pricli.RED])
