@@ -101,6 +101,12 @@ class Nemo:
 
         if self.ports_to_scan is not None:
             self.nmap_options.append(self.ports_to_scan)
+        
+        #### append netmask to (network) ip if not provided ####
+        if self.network is not None:
+            if '/' not in self.network:
+                self.network += '/'+self.netmask
+
     
     def AddSetting(self,key,value):
         self.settings_bindings[key] = value

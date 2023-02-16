@@ -519,10 +519,10 @@ class OptionsChoiceMenu:
                 else: self.pos = len(choices)
             elif self.key_pressed == ord('\n'):
                 changed_value = self.pricli.PrintInput()
-                if 'True' in changed_value or 'true' in changed_value or '1' in changed_value or changed_value == 1:
+                if 'True' in changed_value or 'true' in changed_value or '1' == changed_value or changed_value == 1:
                     print("TRUE")
                     changed_value = True
-                elif 'False' in changed_value or 'false' in changed_value or '0' in changed_value or changed_value == 0:
+                elif 'False' in changed_value or 'false' in changed_value or '0' == changed_value or changed_value == 0:
                     print("FALSE")
                     changed_value = False
                 choices[options[self.pos]] = changed_value

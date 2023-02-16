@@ -16,7 +16,7 @@ def Analyzer(nemo):
 
         # lock.acquire()
         pricli.Printlnr("Searching for hosts...")
-        network_scanner.NetworkDiscovery(network_status.network)
+        network_scanner.NetworkDiscovery(nemo.network)
         network_status.Update()
 
         # pricli.Clear()
