@@ -118,8 +118,12 @@ class Nemo:
         setattr(self,key,value)
         self.UpdateNmapOptions()
     
-    def ChangeMember(self,member,value):
-        member = value
+    def SetSettings(self,settings):
+        for key,value in settings.items():
+            setattr(self,key,value)
+        self.UpdateNmapOptions()
+    # def ChangeMember(self,member,value):
+    #     member = value
 
     def SetNetworkStatus(self,network_status):
         self.network_status = network_status
@@ -416,14 +420,20 @@ def PortScan(nemo):
             lines = []
             colors = []
             if network_scanner.IsHostUp(host.ip):
-                # host.ports = network_scanner.ServiceScan(host.ip,scan_type)
-                # host.CheckChanges()
-                lines,colors = PortScanResults(host.ip,nemo,[[pricli.normal_color,pricli.RED,pricli.normal_color,pricli.BLUE,pricli.normal_color]]) 
+                host.ports = network_scanner.ServiceScan(host.ip,nemo.scan_type)
+                host.CheckChanges(nemo.send_mail)
+                if host.hostname != '':
+                    lines,colors = PortScanResults(host.ip,nemo,proto=1,colr=[[pricli.normal_color,pricli.RED,pricli.normal_color,pricli.BLUE,pricli.normal_color]]) 
+                else:
+                    lines,colors = PortScanResults(host.ip,nemo,proto=1,colr=[[pricli.normal_color,pricli.RED]]) 
             else:
                 continue
 
             if fancy:
-                lines.insert(0,["PORT INFO FOR ",host.ip,' (',host.hostname,')'])
+                if host.hostname != '':
+                    lines.insert(0,["PORT INFO FOR ",host.ip,' (',host.hostname,')'])
+                else:
+                    lines.insert(0,["PORT INFO FOR ",host.ip])
                 if len(lines) + pricli.current_page.current_line > pricli.screen_rows:
                     pricli.CreateNewPage()
 
@@ -570,8 +580,7 @@ def MainMenu(nemo):
                 if settings_choice == -1: #### Exit chosen
                     break
                 settings = nemo.settings.DrawOption(settings_choice-1)
-                for key,value in settings.items():
-                    nemo.SetSetting(key,value)
+                nemo.SetSettings(settings)
                 continue
             continue
             

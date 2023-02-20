@@ -30,6 +30,8 @@ class Host(object):
 
     def SaveJson(self):
         json_file = '{\n\t"ip":'+'"'+self.ip+'",\n\t"hostname":'+'"'+self.hostname+'",\n\t"mac":'+'"'+self.mac+'",\n\t"ports":['
+        if self.ports is None:
+            return
         for port_index in range(len(self.ports)):
             port = self.ports[port_index]
             json_file += '\n\t\t{\n\t\t\t"port":'+'"'+port.num+'",'+'\n\t\t\t"service":'+'"'+port.service+'",\n\t\t\t'+'"version":'+'"'+port.version+'"\n\t\t}'

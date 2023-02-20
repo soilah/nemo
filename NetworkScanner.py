@@ -294,7 +294,7 @@ class NetworkScanner:
         cmd.append(self.nmap_bin)
         if str(scan_type) == str(2):
             cmd.append("-sV")
-            cmd.append("-Pn")
+            # cmd.append("-Pn")
         for opt in self.nmap_options:
             cmd.append(opt)
         cmd.append(ip)
