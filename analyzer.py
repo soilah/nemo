@@ -1,6 +1,6 @@
 # from Nemo import OsDetectionResults, PortScanResults
 import Nemo
-from Pricli import ControlPanel, InfoWindow
+from Pricli import ControlPanel, InfoWindow, Message
 import time
 
 def Analyzer(nemo):
@@ -9,6 +9,7 @@ def Analyzer(nemo):
     network_scanner = nemo.network_scanner
     stopped = False
     control_panel = None
+
     while True:
         if stopped:
             break
@@ -61,7 +62,18 @@ def Analyzer(nemo):
 
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
+
                     nemo.SetScanType(int(action))
+
+                    message = Message(pricli,'Init')
+                    message.setControlPanel(control_panel)
+                    if nemo.scan_type == 1:
+                        message.setMessage('Running service scan...')
+                    else:
+                        message.setMessage('Running service scan (version)...')
+                    message.Show()
+                    os_lines, os_colors = Nemo.OsDetectionResults(host_ip,nemo)
+                    
 
                     lines,colors = Nemo.PortScanResults(host_ip,nemo)
                        
@@ -80,6 +92,8 @@ def Analyzer(nemo):
 
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
+                    message = Message(pricli,'Running OS Detection...')
+                    message.show()
                     lines,colors = Nemo.OsDetectionResults(host_ip,nemo)
                     info_window = InfoWindow(pricli,["OS INFO"],lines,colors)
                     control_panel.InsertWindow(info_window)
@@ -87,7 +101,7 @@ def Analyzer(nemo):
 
                 #### BOTH OS detection and Port Scan ####
                 elif action == 4:
-                    nemo.SetScanType(2)
+                    nemo.SetScanType(1)
                     title = ['OS and Service info for: ',host_ip]
                     title_colors = [pricli.normal_color,pricli.BLUE]
 
@@ -97,7 +111,16 @@ def Analyzer(nemo):
 
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
+                    
+                    message = Message(pricli,'Running OS Detection...')
+                    message.setControlPanel(control_panel)
+                    message.Show()
                     os_lines, os_colors = Nemo.OsDetectionResults(host_ip,nemo)
+                    if nemo.scan_type == 1:
+                        message.setMessage('Running service scan...')
+                    else:
+                        message.setMessage('Running service scan (version)...')
+                    message.Show()
                     port_lines, port_colors = Nemo.PortScanResults(host_ip,nemo)
 
                     os_info_window = InfoWindow(pricli,['OS INFO'],os_lines,os_colors)
