@@ -71,6 +71,30 @@ class Page:
 
 
 
+
+class Message:
+    def __init__(self,pricli,text):
+        self.pricli = pricli
+        self.text = text
+        self.control_panel = None
+
+        self.pos_x = self.pricli.screen_cols - 50
+        self.pos_y = 10
+
+
+    def setMessage(self,text):
+        self.pricli.screen.addstr(self.control_panel.bar_row+4,int(self.pricli.screen_cols/2)-int(len(self.text)/2),' '*len(self.text),curses.color_pair(self.pricli.RED))
+        self.text = text
+
+    def setControlPanel(self,cp):
+        self.control_panel = cp
+
+
+    def Show(self):
+        self.pricli.screen.addstr(self.control_panel.bar_row+4,int(self.pricli.screen_cols/2-int(len(self.text)/2)),self.text,curses.color_pair(self.pricli.RED))
+        self.pricli.screen.refresh()
+
+
     #### An Info Window looks like: 
     # ****************
     # *    Title     *
@@ -238,6 +262,9 @@ class ControlPanel:
 
         self.info_text = None
 
+        self.bar_row = 0
+        self.controls_row = 0
+
         # self.window_title_colors = 
         # [pricli.normal_color,pricli.BLUE,pricli.normal_color,pricli.RED,pricli.normal_color]
 
@@ -253,7 +280,7 @@ class ControlPanel:
         self.control_keys['s'] = 'Scroll Down'
         self.control_keys['r'] = 'Restart Analysis'
 
-        self.current_info_window = 1
+        self.current_info_window = 0
 
     def PrintBanner(self):
         # self.pricli.Clear()
@@ -298,11 +325,11 @@ class ControlPanel:
         if self.top_pos + self.lines_per_page[self.current_page-1] + len(window.lines_to_draw) > self.pricli.screen_rows:
             # self.lines_per_page.append(len(window.lines_to_draw))
             # self.current_page += 1
-            print("NAI... THA GAMITHEI! ")
-            print(window.lines)
-            print(window.colors)
-            time.sleep(5)
-            lines_that_fit = self.pricli.screen_rows - self.top_pos
+            # print("NAI... THA GAMITHEI! ")
+            # print(window.lines)
+            # print(window.colors)
+            # time.sleep(5)
+            lines_that_fit = self.pricli.screen_rows - self.top_pos - 20
             window.last_line_index = lines_that_fit
             window.UpdateWindowLines()
         else:
@@ -331,6 +358,7 @@ class ControlPanel:
         # key_colors.append(self.pricli.CYAN)
         self.pricli.UpdatePage(['\n'])
         self.pricli.UpdatePage(['-'*self.pricli.screen_cols])
+        self.controls_row = self.pricli.current_page.current_line
         line = '|'
         self.control_keys_lines = []
         for key in self.control_keys.keys():
@@ -351,6 +379,7 @@ class ControlPanel:
         
         self.pricli.UpdatePage(['\n'])
         self.pricli.UpdatePage([self.top_seperator1],[self.pricli.RED])
+        self.bar_row = self.pricli.current_page.current_line
         # self.progress_line = self.pricli.GetCur()
         self.pricli.UpdatePage([self.top_seperator2],[self.pricli.GREEN])
         self.pricli.UpdatePage([self.top_seperator3],[self.pricli.RED])
