@@ -105,7 +105,8 @@ class Message:
     # * Line4        *
     # ****************
 class InfoWindow:
-    def __init__(self,pricli,title,lines,colors,border_color = None):
+    def __init__(self,pricli,title,lines,colors,border_color = None,id=0):
+        self.id = id
         self.pricli = pricli
         self.title = title
         self.lines = lines
@@ -235,6 +236,8 @@ class InfoWindow:
     def UpdateWindowLines(self):
         self.lines_to_draw[3:-1] = self.lines[self.top_line_index:self.last_line_index]
         self.colors_to_draw[3:-1] = self.colors[self.top_line_index+1:self.last_line_index+1]
+    
+        
 
 
 #### This is an interface that may come handy when someone
@@ -259,6 +262,7 @@ class ControlPanel:
         self.info_windows = []
         self.progress_line = 0
         self.top_pos = 17
+        self.window_positions = dict()
 
         self.info_text = None
 
@@ -273,14 +277,18 @@ class ControlPanel:
         self.current_page = 0
         self.lines_per_page = [0]
         self.control_keys['q'] = 'Quit'
-        self.control_keys['k'] = 'Previous Page'
-        self.control_keys['l'] = 'Next Page'
+        # self.control_keys['k'] = 'Previous Page'
+        # self.control_keys['l'] = 'Next Page'
+        self.control_keys['x'] = 'Action'
         self.control_keys['n'] = 'Toggle Info Window'
         self.control_keys['w'] = 'Scroll Up'
         self.control_keys['s'] = 'Scroll Down'
         self.control_keys['r'] = 'Restart Analysis'
 
         self.current_info_window = 0
+
+        self.pos = 0
+        self.key_pressed = None
 
     def PrintBanner(self):
         # self.pricli.Clear()
@@ -394,6 +402,7 @@ class ControlPanel:
             # self.info_windows[0].DrawWindow(self.pricli)
         # else:
         # self.pricli.ChangeTop(self.pricli.GetCur())
+        self.info_windows_start_row = self.pricli.current_page.current_line
         if drawInfowindow:
             self.DrawInfoWindows(horizontal=horizontal)
         
@@ -454,6 +463,150 @@ class ControlPanel:
             self.current_info_window += 1
         self.info_windows[self.current_info_window].colors_to_draw[1] = [border_color,self.pricli.RED,border_color]
         self.Draw()
+    
+    def StartAction(self):
+        ### holds for every window, its starting pos ###
+        # window_positions = dict()
+        longest_x = 0
+        if len(self.info_windows) == 1:
+            self.window_positions[0] = 1
+        else:
+            for i in range(0,len(self.info_windows)):
+                self.window_positions[i] = longest_x + 1
+                longest_x += self.info_windows[i].max_width
+                longest_x += 4
+
+        start_x = self.window_positions[self.current_info_window] + 1 
+        start_y = self.bar_row + 9
+
+        cur_win = self.info_windows[self.current_info_window] 
+        ports = cur_win.lines[::2]
+        first = True
+        prev_text = ''
+        prev_pos = -1
+        prev_line = -1
+        line = 0
+        while self.key_pressed != ord('q'):
+            # self.pricli.Clear()
+            # print(ports)
+            # print(cur_win.lines)
+            # time.sleep(5)
+            text = ports[self.pos][1] + ' '*(cur_win.max_width - len(ports[self.pos][1]))
+            # self.pos = 0
+            # self.pricli.hcolor = self.pricli.GREEN
+            if not first:
+                prev_text = ports[prev_pos][1] + ' '*(cur_win.max_width - len(ports[prev_pos][1]))
+                self.pricli.screen.addstr(start_y+prev_line,start_x,prev_text,curses.color_pair(self.pricli.YELLOW))
+
+            first = False
+
+            self.pricli.screen.addstr(start_y+line,start_x,text,curses.color_pair(self.pricli.REDH))
+            self.pricli.screen.refresh()
+            self.key_pressed = self.pricli.Input() # Gets user input
+
+
+            prev_pos = self.pos
+            prev_line = line
+            if self.key_pressed == 258: ## down arrow
+                if prev_pos == len(ports) - 1:
+                    continue
+                if self.pos < len(ports):
+                    self.pos += 1
+                    line += 2
+                else: self.pos = 1
+
+            elif self.key_pressed == 259: ## up arrow
+                if prev_pos == 0:
+                    continue
+                if self.pos > 0:
+                    self.pos -= 1
+                    line -= 2
+                else: self.pos = len(ports)
+            
+            elif self.key_pressed == ord('\n'):
+                cur_pos = self.pos
+                self.ShowMenuPorts(ports[self.pos][1])
+                self.pos = cur_pos
+
+            prev_text = text
+
+        prev_text = ports[prev_pos][1] + ' '*(cur_win.max_width - len(ports[prev_pos][1]))
+        self.pricli.screen.addstr(start_y+prev_line,start_x,prev_text,curses.color_pair(self.pricli.YELLOW))
+        self.pricli.screen.refresh()
+        self.pos = 0
+        self.key_pressed = None
+    
+    def ShowMenuPorts(self,port):
+        options = ['Nmap Scripts','Option2','Option3','Option4']
+        ## find longest option
+        longest_option = 0
+        for op in options:
+            if len(op) > longest_option:
+                longest_option = len(op)
+        
+        start_x = self.window_positions[self.current_info_window] + self.info_windows[self.current_info_window].max_width + 5
+        start_y = self.bar_row + 6
+
+        initial_y = self.pricli.GetCur()
+        self.pricli.ChangeCur(start_y)
+
+        first = True
+        for i in range(0,len(options)):
+            if first:
+                self.pricli.Print(options[i] + ' '*(longest_option - len(options[i])),self.pricli.REDH,line=start_y + i,pos=start_x)
+            else:
+                self.pricli.Print(options[i] + ' '*(longest_option - len(options[i])),self.pricli.RED,line=start_y + i,pos=start_x)
+            first = False
+
+        first = True
+        self.pos = 0
+        while self.key_pressed != ord('q'):
+            if not first:
+                self.pricli.Print(options[prev_pos] + ' '*(longest_option - len(options[prev_pos])),self.pricli.RED,line=start_y + prev_pos,pos=start_x)
+            # else:
+            self.pricli.Print(options[self.pos]+ ' '*(longest_option - len(options[self.pos])),self.pricli.REDH,line=start_y + self.pos,pos=start_x)
+            first = False
+
+            self.key_pressed = self.pricli.Input()
+
+
+            prev_pos = self.pos
+
+            if self.key_pressed == 258: ## down arrow
+                if prev_pos == len(options) - 1:
+                    continue
+                if self.pos < len(options) - 1:
+                    self.pos += 1
+                    # line += 2
+                # else: self.pos = 1
+
+            elif self.key_pressed == 259: ## up arrow
+                if prev_pos == 0:
+                    continue
+                if self.pos > 0:
+                    self.pos -= 1
+                    # line -= 2
+        self.pos = 0
+        self.key_pressed = None
+        for i in range(0,len(options)):
+            self.pricli.Print(' '*longest_option,self.pricli.BLUE,line=start_y + i,pos=start_x)
+                # else: self.pos = len(options)
+        self.pricli.ChangeCur(initial_y)
+            
+            # elif self.key_pressed == ord('\n'):
+            
+
+        
+
+
+
+            # elif self.key_pressed == ord('\n'):
+
+
+
+
+
+
 
 #### This class represents a list that has options to be changed
 #### inside a settings menu. If the settings menu has options
@@ -791,6 +944,35 @@ class Pricli:
         
         self.longest_pos = 1
 
+        
+        ## colors
+        self.GREEN = 1
+        self.BLUE = 2
+        self.WHITE = 3
+        self.RED = 4
+        self.YELLOW = 5
+        self.MAGENTA = 6
+        self.CYAN = 7
+        self.GREENH = 8
+        self.BLUEH = 9
+        self.WHITEH = 10
+        self.REDH = 11
+        self.YELLOWH = 12
+        self.MAGENTAH = 13
+        self.CYANH = 14
+
+        self.BOLD = curses.A_BOLD
+
+        self.TAB = '\t'
+
+
+
+        self.normal_color = curses.A_NORMAL
+        # self.hcolor = self.GREEN
+        self.highlighted_color = curses.color_pair(self.GREEN)
+        self.bold = self.BOLD
+
+
 
         ## initalize color pairs
         curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
@@ -800,26 +982,18 @@ class Pricli:
         curses.init_pair(5, curses.COLOR_YELLOW, curses.COLOR_BLACK)
         curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
         curses.init_pair(7, curses.COLOR_CYAN, curses.COLOR_BLACK)
+        curses.init_pair(8, curses.COLOR_GREEN, curses.COLOR_GREEN)
+        curses.init_pair(9, curses.COLOR_BLUE, curses.COLOR_GREEN)
+        curses.init_pair(10, curses.COLOR_WHITE, curses.COLOR_GREEN)
+        curses.init_pair(11, curses.COLOR_RED, curses.COLOR_GREEN)
+        curses.init_pair(12, curses.COLOR_YELLOW, curses.COLOR_GREEN)
+        curses.init_pair(13, curses.COLOR_MAGENTA, curses.COLOR_GREEN)
+        curses.init_pair(14, curses.COLOR_CYAN, curses.COLOR_GREEN)
 
+        
 
-        ## colors
-        self.GREEN = 1
-        self.BLUE = 2
-        self.WHITE = 3
-        self.RED = 4
-        self.YELLOW = 5
-        self.MAGENTA = 6
-        self.CYAN = 7
-
-        self.BOLD = curses.A_BOLD
-
-        self.TAB = '\t'
-
-
-        self.normal_color = curses.A_NORMAL
-        self.highlighted_color = curses.color_pair(self.GREEN)
-        self.bold = self.BOLD
-
+        
+        
         ## KEYS
         self.UP = curses.KEY_UP
         self.DOWN = curses.KEY_DOWN

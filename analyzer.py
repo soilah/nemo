@@ -93,9 +93,10 @@ def Analyzer(nemo):
                     control_panel = ControlPanel(pricli,None,title,title_colors)
                     control_panel.Draw()
                     message = Message(pricli,'Running OS Detection...')
-                    message.show()
+                    message.setControlPanel(control_panel)
+                    message.Show()
                     lines,colors = Nemo.OsDetectionResults(host_ip,nemo)
-                    info_window = InfoWindow(pricli,["OS INFO"],lines,colors)
+                    info_window = InfoWindow(pricli,["OS INFO"],lines,colors,id=1)
                     control_panel.InsertWindow(info_window)
                     control_panel.Draw()
 
@@ -123,7 +124,7 @@ def Analyzer(nemo):
                     message.Show()
                     port_lines, port_colors = Nemo.PortScanResults(host_ip,nemo)
 
-                    os_info_window = InfoWindow(pricli,['OS INFO'],os_lines,os_colors)
+                    os_info_window = InfoWindow(pricli,['OS INFO'],os_lines,os_colors,id=1)
                     port_info_window = InfoWindow(pricli,['Port/Services Info'],port_lines,port_colors)
                     control_panel.InsertWindow(os_info_window)
                     control_panel.InsertWindow(port_info_window)
@@ -165,6 +166,9 @@ def Analyzer(nemo):
                     if input == ord('s'):
                         if(control_panel.info_windows[control_panel.current_info_window].ScrollDown()):
                             control_panel.Draw()
+                    if input == ord('x'):
+                        if control_panel.info_windows[control_panel.current_info_window].id == 0:
+                            control_panel.StartAction()
                     if input == ord('r'):
                         restart_selected = True
                         break
