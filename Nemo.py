@@ -105,6 +105,8 @@ class Nemo:
         #### append netmask to (network) ip if not provided ####
         if self.network is not None:
             if '/' not in self.network:
+                if self.netmask is None:
+                    self.netmask = '24'
                 self.network += '/'+self.netmask
 
     
@@ -580,6 +582,7 @@ def MainMenu(nemo):
             
         elif choice == 2:
             analyzer.Analyzer(nemo)
+            #nemo.proman.StartThread(analyzer.Analyzer, (nemo,))
             # pricli.lock.acquire()
             # is_in_another_menu = True
             continue
@@ -624,10 +627,15 @@ def MainMenu(nemo):
 def getNetInfo(pricli):
     cmd = "ip addr | grep inet | awk '{print $2}' | grep -v 127.0.0.1 | grep -E -i '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/[0-9]{1,3}$'"
     ## The above command, prints all the networks that each interface is connected to, except the localhost net.
-    res = proman.RunProcess(cmd,shell=True).split('\n')[:-1]
-    res.append("Exit")
-    choice = pricli.menu.Menu("Choose a network to scan...",res)
-    return res[choice-1]
+    #nets_ifconfig = proman.RunProcess(cmd,shell=True).split('\n')[:-1]
+    ## Try to get networks from route info.
+    cmd = "ip route | cut -d\" \" -f1 | grep / | grep -v 169.254.0.0/16"
+    nets_route = proman.RunProcess(cmd,shell=True).split('\n')[:-1]
+    # nets = nets_ifconfig + nets_route
+    nets = nets_route
+    nets.append("Exit")
+    choice = pricli.menu.Menu("Choose a network to scan...",nets)
+    return nets[choice-1]
 
 def ParseArguments():
     parser = argparse.ArgumentParser(prog='net_status',description='A network monitor/analyzer')
