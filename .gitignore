@@ -1,5 +1,6 @@
 **/__pycache__
 **/Networks
+**/nemo-env
 *.swp
 *TelegramBot.py
 *SendMail.py
