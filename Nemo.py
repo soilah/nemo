@@ -313,6 +313,16 @@ def Exit(pricli):
     pricli.End()
 
 
+def print_simple_scan_header(pricli,art_width,network_status,biggest_mac):
+    pricli.UpdatePage(['='*int((art_width - 6)/2)+" SCAN "+'='*int((art_width - 5)/2)],[pricli.RED])
+    pricli.UpdatePage(["Found ", str(network_status.numHosts)," total hosts"],[pricli.WHITE, pricli.YELLOW, pricli.YELLOW])
+    pricli.UpdatePage(['='*int((art_width - 6)/2)+" SCAN "+'='*int((art_width - 5)/2)],[pricli.RED])
+
+    number_of_spaces = int(pricli.screen_cols/10)
+    
+
+    pricli.UpdatePage(['IP'+' '*number_of_spaces+'MAC'+' '*number_of_spaces+'TYPE'+' '*biggest_mac+'HOSTNAME'])
+    pricli.UpdatePage(['\n'])
 
 
 def simple_scan(nemo):
@@ -348,24 +358,32 @@ def SimpleScan(nemo):
             return
 
         art_width = int(pricli.screen_cols/3)
-        pricli.UpdatePage(['='*int((art_width - 6)/2)+" SCAN "+'='*int((art_width - 5)/2)],[pricli.RED])
-        pricli.UpdatePage(["Found ", str(network_status.numHosts)," total hosts"],[pricli.WHITE, pricli.YELLOW, pricli.YELLOW])
-        pricli.UpdatePage(['='*int((art_width - 6)/2)+" SCAN "+'='*int((art_width - 5)/2)],[pricli.RED])
+        # pricli.UpdatePage(['='*int((art_width - 6)/2)+" SCAN "+'='*int((art_width - 5)/2)],[pricli.RED])
+        # pricli.UpdatePage(["Found ", str(network_status.numHosts)," total hosts"],[pricli.WHITE, pricli.YELLOW, pricli.YELLOW])
+        # pricli.UpdatePage(['='*int((art_width - 6)/2)+" SCAN "+'='*int((art_width - 5)/2)],[pricli.RED])
 
-        number_of_spaces = int(pricli.screen_cols/10)
         
+        # pricli.UpdatePage(['IP'+' '*number_of_spaces+'MAC'+' '*number_of_spaces+'TYPE'+' '*biggest_mac+'HOSTNAME'])
+        # pricli.UpdatePage(['\n'])
+
+
         biggest_mac = 0
         for host in network_status.hosts:
             if len(host.mac_type) > biggest_mac:
                 biggest_mac = len(host.mac_type)
+        biggest_mac = len(host.mac_type)
 
-        pricli.UpdatePage(['IP'+' '*number_of_spaces+'MAC'+' '*number_of_spaces+'TYPE'+' '*biggest_mac+'HOSTNAME'])
-        pricli.UpdatePage(['\n'])
+        number_of_spaces = int(pricli.screen_cols/10)
+        print_simple_scan_header(pricli,art_width,network_status,biggest_mac)
 
         for host in network_status.hosts:
             ScanText = host.ip + '\t' + host.hostname
             if not pricli.AssessText(ScanText):
                 pricli.CreateNewPage()
+                print_simple_scan_header(pricli,art_width,network_status,biggest_mac)
+
+                # if pricli.current_page.current_line + 1 > pricli.screen_rows:
+                    # pricli.CreateNewPage()
             pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.mac_type, ' '*(biggest_mac-len(host.mac_type)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.CYAN,pricli.WHITE,pricli.RED])
 
         if len(network_status.new_hosts):
@@ -374,6 +392,13 @@ def SimpleScan(nemo):
             for host in network_status.new_hosts:
                 if nemo.send_mail:
                     host.NotifyUp()
+
+                if not pricli.AssessText(ScanText):
+                    pricli.CreateNewPage()
+                    print_simple_scan_header(pricli,art_width,network_status,biggest_mac)
+                # if pricli.current_page.current_line + 1 > pricli.screen_rows:
+                #     pricli.CreateNewPage()
+                #     print_simple_scan_header(pricli,art_width,network_status.numHosts)
                 pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.mac_type,' '*(biggest_mac-len(host.mac_type)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.CYAN,pricli.WHITE,pricli.RED])
 
         if len(network_status.disconnected):
@@ -382,6 +407,13 @@ def SimpleScan(nemo):
             for host in network_status.disconnected:
                 if nemo.send_mail:
                     host.NotifyDown()
+
+                if not pricli.AssessText(ScanText):
+                    pricli.CreateNewPage()
+                    print_simple_scan_header(pricli,art_width,network_status,biggest_mac)
+                # if pricli.current_page.current_line + 1 > pricli.screen_rows:
+                #     pricli.CreateNewPage()
+                #     print_simple_scan_header(pricli,art_width,network_status.numHosts)
                 pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.mac_type,' '*(biggest_mac-len(host.mac_type)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.CYAN,pricli.WHITE,pricli.RED])
 
         pricli.RefreshPage()
