@@ -72,11 +72,10 @@ def Analyzer(nemo):
                     else:
                         message.setMessage('Running service scan (version)...')
                     message.Show()
-                    #os_lines, os_colors = Nemo.OsDetectionResults(host_ip,nemo)
+                    os_lines, os_colors = Nemo.OsDetectionResults(host_ip,nemo)
+                    
 
                     lines,colors = Nemo.PortScanResults(host_ip,nemo)
-
-                  #  key_pressed = pricli.Input()
                        
                     info_window = InfoWindow(pricli,["PORT INFO"],lines,colors)
                     control_panel.InsertWindow(info_window)

@@ -105,8 +105,6 @@ class Nemo:
         #### append netmask to (network) ip if not provided ####
         if self.network is not None:
             if '/' not in self.network:
-                if self.netmask is None:
-                    self.netmask = '24'
                 self.network += '/'+self.netmask
 
     
@@ -293,6 +291,11 @@ class NetworkStatus(object):
         networks_path = os.getcwd()+'/Networks'
         os.mkdir(networks_path)
 
+        tcp_path = networks_path+'/tcp'
+        udp_path = networks_path+'/udp'
+        os.mkdir(tcp_path)
+        os.mkdir(udp_path)
+
 
     #### Every network scanned, has its own folder placed inside the 'Networks' folder ####
     def InitJson(self):
@@ -422,7 +425,7 @@ def PortScan(nemo):
             lines = []
             colors = []
             if network_scanner.IsHostUp(host.ip):
-                host.ports = network_scanner.ServiceScan(host.ip,nemo.scan_type)
+                host.ports, proto = network_scanner.ServiceScan(host.ip,nemo.scan_type)
                 host.CheckChanges(nemo.send_mail)
                 if host.hostname != '':
                     lines,colors = PortScanResults(host.ip,nemo,proto=1,colr=[[pricli.normal_color,pricli.RED,pricli.normal_color,pricli.BLUE,pricli.normal_color]]) 
@@ -457,13 +460,20 @@ def PortScan(nemo):
 #### proto=1 for tcp and 2 for udp ####
 def PortScanResults(host_ip,nemo,proto=1,colr=None):
     host = nemo.network_status.GetHostByIp(host_ip)
+    # tcp
     if proto == 1:
-        host.ports = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
+        host.ports,protocol = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
+    # udp
     elif proto == 2:
-        host.ports = nemo.network_scanner.UdpScan(host_ip,scan_type=nemo.scan_type)
+        host.ports,protocol = nemo.network_scanner.UdpScan(host_ip,scan_type=0) # scan_type = 0 for udp
+
+    if protocol == 'tcp':
+        host.ports_tcp = host.ports
+    if protocol == 'udp':
+        host.ports_udp = host.ports
         
     host.CheckChanges(nemo.send_mail)
-    host.SaveJson()
+    host.SaveJson(protocol)
 
     pricli = nemo.pricli
 
@@ -480,7 +490,7 @@ def PortScanResults(host_ip,nemo,proto=1,colr=None):
         lines.append(['No scanned ports open'])
         colors.append([pricli.RED])
     for port in host.ports:
-        lines.append([port.num+'/tcp'])
+        lines.append([port.num+'/'+protocol])
         colors.append([pricli.YELLOW])
         if nemo.scan_type == 1:
             lines.append(['Service: ',port.service])
@@ -570,7 +580,6 @@ def MainMenu(nemo):
             
         elif choice == 2:
             analyzer.Analyzer(nemo)
-            #nemo.proman.StartThread(analyzer.Analyzer, (nemo,))
             # pricli.lock.acquire()
             # is_in_another_menu = True
             continue
@@ -615,15 +624,10 @@ def MainMenu(nemo):
 def getNetInfo(pricli):
     cmd = "ip addr | grep inet | awk '{print $2}' | grep -v 127.0.0.1 | grep -E -i '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/[0-9]{1,3}$'"
     ## The above command, prints all the networks that each interface is connected to, except the localhost net.
-    #nets_ifconfig = proman.RunProcess(cmd,shell=True).split('\n')[:-1]
-    ## Try to get networks from route info.
-    cmd = "ip route | cut -d\" \" -f1 | grep / | grep -v 169.254.0.0/16"
-    nets_route = proman.RunProcess(cmd,shell=True).split('\n')[:-1]
-    # nets = nets_ifconfig + nets_route
-    nets = nets_route
-    nets.append("Exit")
-    choice = pricli.menu.Menu("Choose a network to scan...",nets)
-    return nets[choice-1]
+    res = proman.RunProcess(cmd,shell=True).split('\n')[:-1]
+    res.append("Exit")
+    choice = pricli.menu.Menu("Choose a network to scan...",res)
+    return res[choice-1]
 
 def ParseArguments():
     parser = argparse.ArgumentParser(prog='net_status',description='A network monitor/analyzer')

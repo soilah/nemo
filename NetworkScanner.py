@@ -123,8 +123,10 @@ class NmapParser:
                         version += version_prefix + field.attrib[attr]
 
             ports.append(Port(port,None,service,version))
-
-        return ports
+        
+        if scan_type == 0:
+            return ports,'udp'
+        return ports,'tcp'
     
     def ParseOsScan(self,res):
         self.result_text = res
@@ -295,9 +297,9 @@ class NetworkScanner:
         if str(scan_type) == str(2):
             cmd.append("-sV")
             # cmd.append("-Pn")
+        cmd.append(ip)
         for opt in self.nmap_options:
             cmd.append(opt)
-        cmd.append(ip)
         cmd.append('-oX')
         cmd.append('-')
         
@@ -317,7 +319,7 @@ class NetworkScanner:
         # return self.proman.RunProcessWait(cmd)
         return self.parser.ParseOsScan(self.proman.RunProcessWait(cmd))
     
-    def UdpScan(self,ip,scan_type=1):
+    def UdpScan(self,ip,scan_type=0):
         
         cmd = []
         cmd.append(self.nmap_bin)
