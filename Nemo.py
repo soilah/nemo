@@ -293,11 +293,6 @@ class NetworkStatus(object):
         networks_path = os.getcwd()+'/Networks'
         os.mkdir(networks_path)
 
-        tcp_path = networks_path+'/tcp'
-        udp_path = networks_path+'/udp'
-        os.mkdir(tcp_path)
-        os.mkdir(udp_path)
-
 
     #### Every network scanned, has its own folder placed inside the 'Networks' folder ####
     def InitJson(self):
@@ -427,7 +422,7 @@ def PortScan(nemo):
             lines = []
             colors = []
             if network_scanner.IsHostUp(host.ip):
-                host.ports, proto = network_scanner.ServiceScan(host.ip,nemo.scan_type)
+                host.ports = network_scanner.ServiceScan(host.ip,nemo.scan_type)
                 host.CheckChanges(nemo.send_mail)
                 if host.hostname != '':
                     lines,colors = PortScanResults(host.ip,nemo,proto=1,colr=[[pricli.normal_color,pricli.RED,pricli.normal_color,pricli.BLUE,pricli.normal_color]]) 
@@ -462,20 +457,13 @@ def PortScan(nemo):
 #### proto=1 for tcp and 2 for udp ####
 def PortScanResults(host_ip,nemo,proto=1,colr=None):
     host = nemo.network_status.GetHostByIp(host_ip)
-    # tcp
     if proto == 1:
-        host.ports,protocol = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
-    # udp
+        host.ports = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
     elif proto == 2:
-        host.ports,protocol = nemo.network_scanner.UdpScan(host_ip,scan_type=0) # scan_type = 0 for udp
-
-    if protocol == 'tcp':
-        host.ports_tcp = host.ports
-    if protocol == 'udp':
-        host.ports_udp = host.ports
+        host.ports = nemo.network_scanner.UdpScan(host_ip,scan_type=nemo.scan_type)
         
     host.CheckChanges(nemo.send_mail)
-    host.SaveJson(protocol)
+    host.SaveJson()
 
     pricli = nemo.pricli
 
@@ -492,7 +480,7 @@ def PortScanResults(host_ip,nemo,proto=1,colr=None):
         lines.append(['No scanned ports open'])
         colors.append([pricli.RED])
     for port in host.ports:
-        lines.append([port.num+'/'+protocol])
+        lines.append([port.num+'/tcp'])
         colors.append([pricli.YELLOW])
         if nemo.scan_type == 1:
             lines.append(['Service: ',port.service])
