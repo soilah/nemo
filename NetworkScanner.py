@@ -1,6 +1,8 @@
 from ProMan import ProMan
+import time
 from Host import Host, Port
 from SString import FindSubstr
+import xml.etree.ElementTree as ET
 
 ## This is an Nmap wrapper (hellooo)
 
@@ -55,59 +57,34 @@ class NmapParser:
     
     def ParsePingScan(self,result):
         self.result_text = result
-        lines = result.split('\n') ## Breaks the Nmap output into a list of its lines.
-        lines.pop(len(lines)-1)    ## But it has to remove the last element which is an empty string
+
         self.network_status.disconnected = []
         self.network_status.new_hosts = []
 
-        # self.network_status.hosts = []
-        # if "MAC" in lines[4]:
-        ### Nmap prints a number of lines dedicated to each host.
-        ### If run as root, nmap will also print the mac address of each host
-        ### and so each host will consume three (3) lines. The step variable
-        ### is assigned accordingly so to jump at the corresponding line of each host.
-        ### !! MAY NOT USE THIS TECHNIQUE !!
-        # for line in lines:
-        #     if "MAC" in line:
-        #         step = 3
-        #         break
-        # else:
-        #     step = 2 
-
-        ### Nmap prints a number of lines dedicated to each host.
-        ### Nmap output is of the following style:
-        ### Nmap scan report for hostname (xxx.xxx.xxx.xxx), if a hostname is found for that host, or
-        ### Nmap scan report for xxx.xxx.xxx.xxx, if not
-        ### Generaly, If the line starts with 'Nmap', it contains info about the IP and the hostname (if any)
-
         new_hosts = []
         host_id = 0
-        mac = 'LOCALHOST'
-        ip = ""
-        hostname = ""
-        for line in lines:
-            host_found = False
-            if 'MAC' in line:
-                mac = FindSubstr(line,'MAC Address:',' (').strip()
-            if 'Nmap scan report' in line:
-                # line = lines[i]
-                ### If the 'Nmap' line contains '(': it has info about the hostname
-                if '(' in line: ### Parse Hostname and Ip 
-                    ip_index = line.find('(')+1
-                    host_index = line.find("for") + 4
-                    ip = line[ip_index:len(line)-1]
-                    hostname = line[host_index:ip_index-2]
-                else: ### Parse IP
-                    ip_index = line.find("for") + 4
-                    ip = line[ip_index:len(line)]
-                    hostname = "Unnamed Host"
-                host_found = True
-            if host_found:
-                found_host = Host([ip,hostname],mac=mac)
-                new_hosts.append(found_host)
-                host_found = False
-                ### Create a Host object with found Ip,Hostname
-        # host_id += 1
+
+        nmap_xml_root = ET.fromstring(self.result_text)
+        for host in nmap_xml_root.iter('host'):
+            mac = '____LOCALHOST____'
+            mac_type = 'Unknown'
+            ip = "x.x.x.x"
+            hostname = ''
+            for element in host:
+                for field in element.iter('address'):
+                    if field.attrib['addrtype'] == 'ipv4':
+                        ip = field.attrib['addr']
+                    elif field.attrib['addrtype'] == 'mac':
+                        mac = field.attrib['addr']
+                        if 'vendor' in field.attrib.keys():
+                            mac_type = field.attrib['vendor']
+                    else:
+                        print("WX KATI PHGE SKATA STA ADDRESSES (oute ipv4 oute mac)")
+                for hname in element.iter('hostname'):
+                    hostname = hname.attrib['name']
+                    if hostname == ip:
+                        hostname = ''
+            new_hosts.append(Host([ip,hostname],mac=mac,mac_type=mac_type))
 
         ### Categorize the Hosts found as new,current or disconnected
         new_hosts, same_hosts, disconnected = RefreshHosts(new_hosts,self.network_status.hosts)
@@ -115,55 +92,173 @@ class NmapParser:
         self.network_status.disconnected = disconnected
         self.network_status.hosts = curr_hosts
         self.network_status.new_hosts = new_hosts
-        # self.network_status.Update()
     
     def ParseServiceScan(self,res,scan_type=1):
+        self.result_text = res
         
-        if self.network_status.stopped:
+        if self.network_status.stopped.is_set():
             # stopped = True
             return
 
-        lines = res.split('\n')
-        reached_PORT = False
-        ports = []
-        for line in lines:
-            if reached_PORT:
-                if 'tcp' in line:
-                    data = line.split(' ')
-                    data = [el for el in data if el != '']
-                    if 'open' not in data[1]:
-                        continue
-                    port = data[0]
-                    service = data[2]
-                    version = ''
-                    if str(scan_type) == str(2):
-                        for i in range(3,len(data)):
-                            version += data[i]
-                            version += ' '
-                    ports.append(Port(port,None,service,version))
 
-            else:
-                if 'PORT' in line:
-                    reached_PORT = True
-                continue
+        ports = []
+
+        nmap_xml_root = ET.fromstring(self.result_text)
         
-        return ports
+        for port_info in nmap_xml_root.iter('port'):
+            port = ''
+            service = ''
+            version = ''
+            port = port_info.attrib['portid']
+            version_prefix = ' '
+            attributes = ['product','extrainfo','ostype']
+            for field in port_info.iter('service'):
+                service = field.attrib['name']
+                if 'version' in field.attrib.keys():
+                    version = field.attrib['version']
+                    version_prefix = ' - '
+
+                for attr in attributes:
+                    if attr in field.attrib.keys():
+                        version += version_prefix + field.attrib[attr]
+
+            ports.append(Port(port,None,service,version))
+        
+        if scan_type == 0:
+            return ports,'udp'
+        return ports,'tcp'
     
     def ParseOsScan(self,res):
-        if self.network_status.stopped:
+        self.result_text = res
+        if self.network_status.stopped.is_set():
             return
         os_info = []
         
-        if 'Running' in res:
-            os_info.append(FindSubstr(res,'MAC Address:'))
-            os_info.append(FindSubstr(res,'Device type:'))
-            os_info.append(FindSubstr(res,'Running:'))
-            os_info.append(FindSubstr(res,'OS CPE:'))
-            os_info.append(FindSubstr(res,'OS details:'))
-        elif 'No exact' in res or 'Too many' in res:
-            os_info.append(FindSubstr(res,'MAC Address'))
+        nmap_xml_root = ET.fromstring(self.result_text)
+        
+        mac = ''
+        mac_type = ''
+        mac_not_found = True
+        for mac_info in nmap_xml_root.iter('address'):
+            if mac_info.attrib['addrtype'] == 'mac' and mac_not_found:
+                mac_not_found = False
+                mac = mac_info.attrib['addr']
+                if 'vendor' in mac_info.attrib.keys():
+                    mac_type = mac_info.attrib['vendor']
+                os_info.append(mac)
+                # os_info.append(mac_type)
 
+        osfamily = ''
+        osgen = ''
+        dev_type = ''
+        extra_vendor = ''
+        # cpe = ''
+        found_keywords = []
+        for osclass in nmap_xml_root.iter('osclass'):
+            if 'type' in osclass.attrib.keys():
+                dev_type = osclass.attrib['type']
+            if 'vendor' in osclass.attrib.keys():
+                # if extra_vendor == '':
+                #     extra_vendor = osclass.attrib['vendor']
+                # else:
+                #     extra_vendor = '|' + osclass.attrib['vendor']
+                extra_vendor = osclass.attrib['vendor']
+                if extra_vendor not in found_keywords:
+                    found_keywords.append(extra_vendor)
+            if 'osfamily' in osclass.attrib.keys():
+                # if osfamily == '':
+                #     osfamily = osclass.attrib['osfamily']
+                # else:
+                #     osfamily += '|' + osclass.attrib['osfamily']
+                osfamily = osclass.attrib['osfamily']
+                if osfamily not in found_keywords:
+                    found_keywords.append(osfamily)
+
+            if 'osgen' in osclass.attrib.keys():
+                # osgen += osclass.attrib['osgen'] + '|'
+                osgen = osclass.attrib['osgen']
+                if osgen not in found_keywords:
+                    found_keywords.append(osgen)
+
+            # found_cpes = []
+            # cpes_num = 0
+            # for cpeinfo in osclass.iter('cpe'):
+            #     if cpeinfo.text not in found_cpes:
+            #         cpe += cpeinfo.text + '|'
+            #         cpes_num += 1
+            #         if cpes_num > 2:
+            #             break
+        
+        
+
+        
+        if osgen != '':
+            osgen = osgen[0:len(osgen) - 1]
+        
+        # running = osfamily + ' ' + osgen
+        # if extra_vendor != '' and extra_vendor != osfamily:
+        #     running +=  ' ' +extra_vendor
+        running = ''
+        for keywords in found_keywords:
+            running += keywords + '|'
+
+        if mac_type.strip() != '' or dev_type.strip() != '': 
+            os_info.append(mac_type+' '+dev_type)
+        if running.strip() != '':
+            os_info.append(running)
+        # if cpe.strip() != '':
+        #     os_info.append(cpe)
+        # if cpe.strip() == '' and len(os_info) > 1:
+        #     os_info.append('No cpe info')
+
+        os_details = ''
+        os_matches_found = 0
+        for osinfo in nmap_xml_root.iter('osmatch'):
+            os_details += osinfo.attrib['name'] + '|'
+            os_matches_found += 1
+            if os_matches_found > 2:
+                os_details += ' ....'
+                break
+
+        if os_details.strip() != '': 
+            os_info.append(os_details[0:len(os_details)-1])
+
+        # if 'Running' in res:
+        #     mac_info.append(FindSubstr(res,'MAC Address:'))
+        #     mac_info.append(FindSubstr(res,'Device type:'))
+        #     mac_info.append(FindSubstr(res,'Running:'))
+        #     mac_info.append(FindSubstr(res,'OS CPE:'))
+        #     mac_info.append(FindSubstr(res,'OS details:'))
+
+        # elif 'No exact' in res or 'Too many' in res in res:
+        #     mac_info.append(FindSubstr(res,'MAC Address'))
+
+        # elif 'unreliable' in res:
+        #     return None
+        # print(os_info)
+        # time.sleep(5)
+
+        #### check if all values are empty. This probably means that host is offline or in another network ####
+        empty = True
+        for el in os_info:
+            if el.strip() != '':
+                empty = False
+                break
+        if empty:
+            return None
+        
         return os_info
+    
+    # def ParseUdpScan(self,res):
+    #     self.result_text = res
+
+    #     if self.network_status.stopped.is_set():
+    #         return
+
+    #     udp_info = []
+    #     nmap_xml_root = ET.fromstring(self.result_text)
+
+
 
 class NetworkScanner:
     def __init__(self,network_status,bin='nmap'):
@@ -171,6 +266,10 @@ class NetworkScanner:
         self.proman = ProMan()
         self.network_status = network_status
         self.parser = NmapParser(self.network_status)
+        self.nmap_options = None
+    
+    def SetOptions(self,options):
+        self.nmap_options = options
     
     def IsHostUp(self,ip):
         cmd = []
@@ -185,6 +284,8 @@ class NetworkScanner:
         cmd.append(self.nmap_bin)
         cmd.append('-sP') ## Ping scan, just check if hosts are up
         cmd.append(network)
+        cmd.append('-oX')
+        cmd.append('-')
 
         ## ececute the command and pass it to the parser
         self.parser.ParsePingScan(self.proman.RunProcessWait(cmd))
@@ -195,8 +296,12 @@ class NetworkScanner:
         cmd.append(self.nmap_bin)
         if str(scan_type) == str(2):
             cmd.append("-sV")
-            cmd.append("-Pn")
+            # cmd.append("-Pn")
         cmd.append(ip)
+        for opt in self.nmap_options:
+            cmd.append(opt)
+        cmd.append('-oX')
+        cmd.append('-')
         
 
         return self.parser.ParseServiceScan(self.proman.RunProcessWait(cmd),scan_type=scan_type)
@@ -208,6 +313,20 @@ class NetworkScanner:
         cmd.append('-O')
         cmd.append('-Pn')
         cmd.append(ip)
+        cmd.append('-oX')
+        cmd.append('-')
 
         # return self.proman.RunProcessWait(cmd)
         return self.parser.ParseOsScan(self.proman.RunProcessWait(cmd))
+    
+    def UdpScan(self,ip,scan_type=0):
+        
+        cmd = []
+        cmd.append(self.nmap_bin)
+        cmd.append('-sU')
+        cmd.append('-Pn')
+        cmd.append(ip)
+        cmd.append('-oX')
+        cmd.append('-')
+
+        return self.parser.ParseServiceScan(self.proman.RunProcessWait(cmd),scan_type=scan_type)
