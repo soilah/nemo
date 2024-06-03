@@ -481,6 +481,9 @@ class ControlPanel:
 
         cur_win = self.info_windows[self.current_info_window] 
         ports = cur_win.lines[::2]
+        ### Check if no ports are discovered ###
+        if 'No' in ports[0][1]:
+            return
         first = True
         prev_text = ''
         prev_pos = -1
@@ -525,7 +528,7 @@ class ControlPanel:
             
             elif self.key_pressed == ord('\n'):
                 cur_pos = self.pos
-                self.ShowMenuPorts(ports[self.pos][1])
+                action = self.ShowMenuPorts(ports[self.pos][1])
                 self.pos = cur_pos
 
             prev_text = text
@@ -535,7 +538,11 @@ class ControlPanel:
         self.pricli.screen.refresh()
         self.pos = 0
         self.key_pressed = None
-    
+
+
+
+    ##### Displays the action menu of the ports and returns the choice (index) #####
+
     def ShowMenuPorts(self,port):
         options = ['Nmap Scripts','Option2','Option3','Option4']
         ## find longest option
@@ -586,25 +593,17 @@ class ControlPanel:
                 if self.pos > 0:
                     self.pos -= 1
                     # line -= 2
+            
+            #elif self.key_pressed == ord('\n'):
+            #    if self.pos == 0:
+                    #### nmap scripts option #### 
         self.pos = 0
         self.key_pressed = None
         for i in range(0,len(options)):
-            self.pricli.Print(' '*longest_option,self.pricli.BLUE,line=start_y + i,pos=start_x)
+            self.pricli.Print(' '*longest_option,self.pricli.BLUE,line=start_y + i,pos=start_x) ## Blue is just a color it does not make any difference as it prints spaces
                 # else: self.pos = len(options)
         self.pricli.ChangeCur(initial_y)
             
-            # elif self.key_pressed == ord('\n'):
-            
-
-        
-
-
-
-            # elif self.key_pressed == ord('\n'):
-
-
-
-
 
 
 
