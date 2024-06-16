@@ -743,14 +743,15 @@ def StartNemo(nemo):
         pricli = Pricli()
         nemo.SetPricli(pricli)
         network = getNetInfo(pricli)
+
+        if 'Exit' in network:
+            Exit(pricli)
+            return
         # nemo.SetNetwork(network)
         nemo.SetSetting('network',network)
         nemo.SetSetting('netmask',network[-2:])
         # nemo.SetSetting('dns_server',network[0:-4]+)
         nemo.AddSettings(CreateSettings(nemo,pricli=pricli))
-        if 'Exit' in network:
-            Exit(pricli)
-            return
 
     network_status = NetworkStatus(network,None)
     network_scanner = NetworkScanner(network_status)
