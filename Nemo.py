@@ -1,7 +1,5 @@
-from dis import disco
-from distutils.debug import DEBUG
 import os
-from pickle import FALSE
+import re
 from threading import Event, Lock
 import sched, time
 import socket
@@ -92,20 +90,30 @@ class Nemo:
         self.UpdateNmapOptions()
 
     def UpdateNmapOptions(self):
-        if self.port_stress == self.SCAN_STRESS_FAST:
-            if '-F' not in self.nmap_options:
-                self.nmap_options.append('-F') 
-        elif self.port_stress == self.SCAN_STRESS_FULL:
-            if '-p1-65535' not in self.nmap_options:
-                self.nmap_options.append('-p1-65535')
+        options = []
 
-        if self.ports_to_scan is not None:
-            self.nmap_options.append(self.ports_to_scan)
+        ports = self.ports_to_scan
+        if isinstance(ports,(list,tuple)):
+            ports = ','.join([str(p) for p in ports])
+
+        #### specific ports override the port stress option
+        if ports is not None and str(ports).strip() not in ['','None']:
+            ports = str(ports).strip()
+            if ports.startswith('-p'):
+                ports = ports[2:].strip()
+            options.append('-p'+ports)
+        elif self.port_stress == self.SCAN_STRESS_FAST:
+            options.append('-F') 
+        elif self.port_stress == self.SCAN_STRESS_FULL:
+            options.append('-p1-65535')
+
+        #### the list is shared with the network scanner, so it is changed in place
+        self.nmap_options[:] = options
         
         #### append netmask to (network) ip if not provided ####
-        if self.network is not None:
+        if self.network is not None and self.netmask is not None:
             if '/' not in self.network:
-                self.network += '/'+self.netmask
+                self.network += '/'+str(self.netmask).strip('/')
 
     
     def AddSetting(self,key,value):
@@ -113,14 +121,46 @@ class Nemo:
     
     def GetSetting(self,key):
         return self.settings_bindings[key]
+
+    #### Values coming from the settings menu are text typed by the user,
+    #### so they are converted to the type that each setting expects.
+    def NormalizeSetting(self,key,value):
+        if key in ['scan_type','scan_period','port_stress']:
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                return getattr(self,key)
+            if key == 'scan_type' and value not in [1,2]:
+                return getattr(self,key)
+            if key == 'port_stress' and value not in [1,2,3]:
+                return getattr(self,key)
+            if key == 'scan_period' and value < 1:
+                return getattr(self,key)
+        elif key == 'send_mail':
+            if isinstance(value,str):
+                value = value.strip().lower() in ['true','1','yes','on']
+            else:
+                value = bool(value)
+        elif key in ['network','netmask','dns_server','ports_to_scan']:
+            if isinstance(value,bool):
+                value = str(int(value))
+            if isinstance(value,str) and value.strip() in ['','None']:
+                value = None
+        return value
     
     def SetSetting(self,key,value):
+        value = self.NormalizeSetting(key,value)
         setattr(self,key,value)
+        self.settings_bindings[key] = value
         self.UpdateNmapOptions()
     
     def SetSettings(self,settings):
         for key,value in settings.items():
+            value = self.NormalizeSetting(key,value)
             setattr(self,key,value)
+            self.settings_bindings[key] = value
+            #### show the value that is actually used in the settings menu
+            settings[key] = value
         self.UpdateNmapOptions()
     # def ChangeMember(self,member,value):
     #     member = value
@@ -252,21 +292,9 @@ class NetworkStatus(object):
         return None
     
     def Clear(self):
-        for host in self.hosts:
-            del host
-            self.hosts.remove(host)
         self.hosts = []
-
-        for host in self.disconnected:
-            del host
-            self.disconnected.remove(host)
         self.disconnected = []
-
-        for host in self.new_hosts:
-            del host
-            self.new_hosts.remove(host)
         self.new_hosts = []
-
         self.numHosts = 0
     
     def SortHosts(self):
@@ -289,24 +317,25 @@ class NetworkStatus(object):
     
     def FirstTimeInit(self):
         networks_path = os.getcwd()+'/Networks'
-        os.mkdir(networks_path)
-
-        tcp_path = networks_path+'/tcp'
-        udp_path = networks_path+'/udp'
-        os.mkdir(tcp_path)
-        os.mkdir(udp_path)
+        os.makedirs(networks_path+'/tcp',exist_ok=True)
+        os.makedirs(networks_path+'/udp',exist_ok=True)
 
 
     #### Every network scanned, has its own folder placed inside the 'Networks' folder ####
     def InitJson(self):
         networks_path = os.getcwd()+'/Networks'
-        #### check if path exists. If not initialize the directories (create folder etc)
-        if os.path.exists(networks_path):
-            self.host_files = next(os.walk(networks_path), (None, None, []))[2]  # [] if no file
-            for host in self.hosts:
-                host.LoadJsonData()
-        else:
-            self.FirstTimeInit()
+        #### make sure that the directories exist (create folder etc)
+        self.FirstTimeInit()
+        self.host_files = next(os.walk(networks_path), (None, None, []))[2]  # [] if no file
+        for host in self.hosts:
+            host.LoadJsonData()
+
+
+#### Used in place of pricli when there is no curses screen (--informer switch),
+#### so that every color requested is just 0.
+class NoColors:
+    def __getattr__(self,name):
+        return 0
 
 
 def Exit(pricli):
@@ -392,12 +421,9 @@ def SimpleScan(nemo):
                 if nemo.send_mail:
                     host.NotifyUp()
 
-                if not pricli.AssessText(ScanText):
+                if not pricli.AssessText(host.ip + '\t' + host.hostname):
                     pricli.CreateNewPage()
                     print_simple_scan_header(pricli,art_width,network_status,biggest_mac_type)
-                # if pricli.current_page.current_line + 1 > pricli.screen_rows:
-                #     pricli.CreateNewPage()
-                #     print_simple_scan_header(pricli,art_width,network_status.numHosts)
                 pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.mac_type,' '*(biggest_mac_type-len(host.mac_type)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.CYAN,pricli.WHITE,pricli.RED])
 
         if len(network_status.disconnected):
@@ -407,12 +433,9 @@ def SimpleScan(nemo):
                 if nemo.send_mail:
                     host.NotifyDown()
 
-                if not pricli.AssessText(ScanText):
+                if not pricli.AssessText(host.ip + '\t' + host.hostname):
                     pricli.CreateNewPage()
                     print_simple_scan_header(pricli,art_width,network_status,biggest_mac_type)
-                # if pricli.current_page.current_line + 1 > pricli.screen_rows:
-                #     pricli.CreateNewPage()
-                #     print_simple_scan_header(pricli,art_width,network_status.numHosts)
                 pricli.UpdatePage([host.ip,' '*(number_of_spaces-len(host.ip)+2),host.mac,' '*(number_of_spaces-len(host.mac)+3),host.mac_type,' '*(biggest_mac_type-len(host.mac_type)+3),host.hostname],[pricli.BLUE,pricli.WHITE,pricli.YELLOW,pricli.WHITE,pricli.CYAN,pricli.WHITE,pricli.RED])
 
         pricli.RefreshPage()
@@ -433,6 +456,8 @@ def PortScan(nemo):
     network_status = nemo.network_status
     network_scanner = nemo.network_scanner
     fancy = nemo.fancy
+    #### without curses there are no colors
+    palette = pricli if fancy else NoColors()
     stopped = False
     while True:
 
@@ -448,35 +473,42 @@ def PortScan(nemo):
             pricli.Refresh()
 
         for host in network_status.hosts:
-            if not fancy:
-                print('Host: '+host.ip)
             if network_status.stopped.is_set():
                 stopped = True
                 break
             lines = []
             colors = []
             if network_scanner.IsHostUp(host.ip):
-                host.ports, proto = network_scanner.ServiceScan(host.ip,nemo.scan_type)
-                host.CheckChanges(nemo.send_mail)
                 if host.hostname != '':
-                    lines,colors = PortScanResults(host.ip,nemo,proto=1,colr=[[pricli.normal_color,pricli.RED,pricli.normal_color,pricli.BLUE,pricli.normal_color]]) 
+                    lines,colors = PortScanResults(host.ip,nemo,proto=1,colr=[[palette.normal_color,palette.RED,palette.normal_color,palette.BLUE,palette.normal_color]]) 
                 else:
-                    lines,colors = PortScanResults(host.ip,nemo,proto=1,colr=[[pricli.normal_color,pricli.RED]]) 
+                    lines,colors = PortScanResults(host.ip,nemo,proto=1,colr=[[palette.normal_color,palette.RED]]) 
             else:
                 continue
 
+            if network_status.stopped.is_set():
+                stopped = True
+                break
+
+            if host.hostname != '':
+                lines.insert(0,["PORT INFO FOR ",host.ip,' (',host.hostname,')'])
+            else:
+                lines.insert(0,["PORT INFO FOR ",host.ip])
+
             if fancy:
-                if host.hostname != '':
-                    lines.insert(0,["PORT INFO FOR ",host.ip,' (',host.hostname,')'])
-                else:
-                    lines.insert(0,["PORT INFO FOR ",host.ip])
                 if len(lines) + pricli.current_page.current_line > pricli.screen_rows:
                     pricli.CreateNewPage()
 
                 for line_index in range(len(lines)):
                     pricli.UpdatePage(lines[line_index],colors[line_index])
-            if fancy:
                 pricli.RefreshPage()
+            else:
+                for line in lines:
+                    print(''.join(line),flush=True)
+                print('',flush=True)
+
+        if stopped:
+            break
 
         counter = int(nemo.scan_period)
         while counter > 0:
@@ -491,22 +523,8 @@ def PortScan(nemo):
 #### proto=1 for tcp and 2 for udp ####
 def PortScanResults(host_ip,nemo,proto=1,colr=None):
     host = nemo.network_status.GetHostByIp(host_ip)
-    # tcp
-    if proto == 1:
-        host.ports,protocol = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
-    # udp
-    elif proto == 2:
-        host.ports,protocol = nemo.network_scanner.UdpScan(host_ip,scan_type=0) # scan_type = 0 for udp
-
-    if protocol == 'tcp':
-        host.ports_tcp = host.ports
-    if protocol == 'udp':
-        host.ports_udp = host.ports
-        
-    host.CheckChanges(nemo.send_mail)
-    host.SaveJson(protocol)
-
-    pricli = nemo.pricli
+    #### without curses (--informer switch) there are no colors
+    pricli = nemo.pricli if nemo.pricli is not None else NoColors()
 
     lines = []
     colors = []
@@ -514,6 +532,35 @@ def PortScanResults(host_ip,nemo,proto=1,colr=None):
         colors = [[pricli.RED]]
     else:
         colors = colr
+
+    #### host disappeared from the network since it was selected
+    if host is None:
+        lines.append(['Host is not in the network any more'])
+        colors.append([pricli.RED])
+        return lines,colors
+
+    # udp
+    if proto == 2:
+        ports,protocol = nemo.network_scanner.UdpScan(host_ip,scan_type=0) # scan_type = 0 for udp
+    # tcp
+    else:
+        ports,protocol = nemo.network_scanner.ServiceScan(host_ip,scan_type=nemo.scan_type)
+
+    #### scan was stopped or failed. Do not touch the saved state of the host,
+    #### otherwise all its ports would be reported as closed.
+    if ports is None:
+        lines.append(['Scan did not finish'])
+        colors.append([pricli.RED])
+        return lines,colors
+
+    host.ports = ports
+    if protocol == 'tcp':
+        host.ports_tcp = host.ports
+    if protocol == 'udp':
+        host.ports_udp = host.ports
+        
+    host.CheckChanges(nemo.send_mail,protocol)
+    host.SaveJson(protocol)
 
     # lines.append(['Ports: '])
     # colors.append([pricli.GREEN])
@@ -523,7 +570,7 @@ def PortScanResults(host_ip,nemo,proto=1,colr=None):
     for port in host.ports:
         lines.append([port.num+'/'+protocol])
         colors.append([pricli.YELLOW])
-        if nemo.scan_type == 1:
+        if protocol == 'udp' or nemo.scan_type == 1:
             lines.append(['Service: ',port.service])
             colors.append([pricli.CYAN,pricli.RED])
         else:
@@ -539,10 +586,12 @@ def OsDetectionResults(host_ip,nemo):
     #### check once again if host is up and try until it is or until 3 tries have been passed ####
     tries = 3
     while tries > 0:
-        if not nemo.network_scanner.IsHostUp(host_ip):
-            tries -= 1
-        else:
+        if nemo.network_scanner.IsHostUp(host_ip):
             break
+        tries -= 1
+        if nemo.network_status.stopped.is_set():
+            break
+        time.sleep(1)
 
     os = nemo.network_scanner.OsScan(host_ip)
     lines = []
@@ -591,8 +640,7 @@ def MainMenu(nemo):
     # global network_status
     pricli = nemo.pricli
     network_status = nemo.network_status
-    global process_list
-    global thread_list
+    proman = nemo.proman
     # is_in_another_menu = False ### becomes true if user selects one of the options and false if user is in current menu
     while True:
         # if is_in_another_menu:
@@ -652,8 +700,8 @@ def MainMenu(nemo):
         network_status.stopped.clear()
         pricli.ChangeWindow(reset=True)
 
-def getNetInfo(pricli):
-    cmd = "ip addr | grep inet | awk '{print $2}' | grep -v 127.0.0.1 | grep -E -i '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/[0-9]{1,3}$'"
+def getNetInfo(pricli,proman):
+    cmd = r"ip addr | grep inet | awk '{print $2}' | grep -v 127.0.0.1 | grep -E -i '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/[0-9]{1,3}$'"
     ## The above command, prints all the networks that each interface is connected to, except the localhost net.
     res = proman.RunProcess(cmd,shell=True).split('\n')[:-1]
     res.append("Exit")
@@ -670,35 +718,33 @@ def ParseArguments():
     parser.add_argument('--port-scan-type',choices=['simple','version'],help='simple for simple port discovery, version for version scan (-sV). Default is simple.')
     parser.add_argument('--scan-period',action='store',type=int,help='Time in seconds after which the port scan will be repeated. Default is 30 seconds')
     parser.add_argument('--port-stress',choices=['normal','fast','full'],help='Number of ports to be scanned. Default is normal (1000) ports. Fast scans less than 1000 and full scans all 65535 ports (slow).')
-    parser.add_argument('--ports',metavar='[1-65535]',type=int,nargs='+',help='Specific ports to scan. Ex: --ports 22 80 5001, --ports 1-65535')
+    parser.add_argument('--ports',metavar='PORTS',nargs='+',help='Specific ports or port ranges to scan. Ex: --ports 22 80 5001, --ports 1-65535')
     args = parser.parse_args()
 
     mode = 0
     if args.nofancy:
-        return 1
+        parser.error('--nofancy is not implemented yet. Use --informer for output without curses.')
     elif args.daemon:
-        return 2
+        parser.error('--daemon is not implemented yet.')
     elif args.informer:
         mode = 3
         if args.network is None:
             parser.error('--network option is required with the --informer switch')
-        if args.port_scan_type is None:
-            # parser.error('--port_scan_type option is required with the --informer switch')
-            scan_type = 1
-    else:
-        mode = 0
 
     #### GENERAL options
     scan_period = 30
     port_stress = 1
 
     if args.scan_period is not None:
+        if args.scan_period < 1:
+            parser.error('--scan-period must be a positive number of seconds.')
         scan_period = int(args.scan_period)
-    scan_type = 0
-    if args.port_scan_type == 'simple':
-        scan_type = 1
-    else:
+
+    #### simple port discovery, unless version scan is requested
+    scan_type = 1
+    if args.port_scan_type == 'version':
         scan_type = 2
+
     if args.port_stress is not None:
         if args.ports is not None:
             parser.error('--ports option cannot be used alongside with --port-stress option.')
@@ -707,7 +753,22 @@ def ParseArguments():
         elif args.port_stress == 'full':
             port_stress = 3
 
-    return mode,args.network,scan_type,scan_period,port_stress,args.ports
+    ports = None
+    if args.ports is not None:
+        port_list = []
+        for port_arg in args.ports:
+            port_list += [p for p in port_arg.split(',') if p != '']
+        for port in port_list:
+            valid = re.fullmatch(r'(\d{1,5})(-(\d{1,5}))?',port)
+            if valid is not None:
+                first = int(valid.group(1))
+                last = int(valid.group(3)) if valid.group(3) is not None else first
+                valid = 1 <= first <= last <= 65535
+            if not valid:
+                parser.error('invalid port or port range: '+port)
+        ports = ','.join(port_list)
+
+    return mode,args.network,scan_type,scan_period,port_stress,ports
 
 def CreateSettings(nemo,pricli):
     settings = Settings(pricli,nemo)
@@ -719,6 +780,7 @@ def CreateSettings(nemo,pricli):
     scan_settings.AddParameter('scan_type',nemo.scan_type)
     scan_settings.AddParameter('scan_period',nemo.scan_period)
     scan_settings.AddParameter('port_stress',nemo.port_stress)
+    scan_settings.AddParameter('ports_to_scan',nemo.ports_to_scan)
     settings.AddOption(scan_settings)
     settings.AddOption(Option(pricli=pricli,title='Port settings'))
     informer_settings = Option(pricli=pricli,title='Informer settings')
@@ -742,19 +804,19 @@ def StartNemo(nemo):
     else:
         pricli = Pricli()
         nemo.SetPricli(pricli)
-        network = getNetInfo(pricli)
+        network = getNetInfo(pricli,nemo.proman)
 
         if 'Exit' in network:
             Exit(pricli)
             return
         # nemo.SetNetwork(network)
         nemo.SetSetting('network',network)
-        nemo.SetSetting('netmask',network[-2:])
+        nemo.SetSetting('netmask',network.split('/')[1])
         # nemo.SetSetting('dns_server',network[0:-4]+)
         nemo.AddSettings(CreateSettings(nemo,pricli=pricli))
 
     network_status = NetworkStatus(network,None)
-    network_scanner = NetworkScanner(network_status)
+    network_scanner = NetworkScanner(network_status,proman=nemo.proman)
     network_scanner.SetOptions(nemo.nmap_options)
     nemo.SetNetworkStatus(network_status)
     nemo.SetNetworkScanner(network_scanner)

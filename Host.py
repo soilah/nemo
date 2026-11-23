@@ -1,7 +1,13 @@
 import json
 import os
 # from TelegramBot import SendMessage
-from SendMail import SendMail
+#### SendMail.py is not part of the repository (it holds the mail credentials).
+#### It must provide a SendMail(subject,message) function. Without it, no mails are sent.
+try:
+    from SendMail import SendMail
+except ImportError:
+    def SendMail(subject,message):
+        pass
 import time
 
 class Port(object):
@@ -33,18 +39,18 @@ class Host(object):
     
 
     def SaveJson(self,proto):
-        json_file = '{\n\t"ip":'+'"'+self.ip+'",\n\t"hostname":'+'"'+self.hostname+'",\n\t"mac":'+'"'+self.mac+'",\n\t"ports":['
         if self.ports is None:
             return
-        for port_index in range(len(self.ports)):
-            port = self.ports[port_index]
-            json_file += '\n\t\t{\n\t\t\t"port":'+'"'+port.num+'",'+'\n\t\t\t"service":'+'"'+port.service+'",\n\t\t\t'+'"version":'+'"'+port.version+'"\n\t\t}'
-            if port_index < len(self.ports) - 1:
-                json_file += ","
-        json_file += '\n\t]\n}'
-        json_file_object = open(os.getcwd()+'/Networks/'+proto+'/host'+str(self.ip)+'.json','w+')
-        json_file_object.write(json_file)
-        json_file_object.close()
+        json_data = {
+            'ip': self.ip,
+            'hostname': self.hostname,
+            'mac': self.mac,
+            'ports': [{'port': port.num, 'service': port.service or '', 'version': port.version or ''} for port in self.ports]
+        }
+        proto_path = os.path.join(os.getcwd(),'Networks',proto)
+        os.makedirs(proto_path,exist_ok=True)
+        with open(os.path.join(proto_path,'host'+str(self.ip)+'.json'),'w') as json_file_object:
+            json.dump(json_data,json_file_object,indent='\t')
 
         #### Refresh json data
         self.LoadJsonData()
@@ -54,88 +60,61 @@ class Host(object):
         udp_path = os.getcwd()+'/Networks/udp/host'+str(self.ip)+'.json'
         for path in [tcp_path,udp_path]:
             if not os.path.exists(path):
-                return
-            json_file_object = open(path,'r')
-            json_data = json.load(json_file_object)
-            mac = json_data['mac']
-            if mac == self.mac:
-                ip = json_data['ip']
-                hostname = json_data['hostname']
+                continue
+            try:
+                with open(path,'r') as json_file_object:
+                    json_data = json.load(json_file_object)
+                #### the saved data belongs to another machine that had the same ip
+                if json_data['mac'] != self.mac:
+                    continue
                 ports = []
                 for port in json_data['ports']:
                     ports.append(Port(port['port'],None,port['service'],port['version']))
-                    # print(port['service'])
-                self.json_ip = ip
-                self.json_hostname = hostname
-                self.json_mac = mac
-                if path == tcp_path:
-                    self.json_tcp_ports = ports
-                elif path == udp_path:
-                    self.json_udp_ports = ports
-
-                json_file_object.close()
-            else:
-                json_file_object.close()
-                return False
+            except (OSError, ValueError, KeyError, TypeError):
+                #### unreadable or corrupted file. It will be rewritten on the next scan
+                continue
+            self.json_ip = json_data.get('ip')
+            self.json_hostname = json_data.get('hostname')
+            self.json_mac = json_data['mac']
+            if path == tcp_path:
+                self.json_tcp_ports = ports
+            elif path == udp_path:
+                self.json_udp_ports = ports
     
-    def CheckChanges(self,send_mail_flag):
-        # if self.mac == self.json_mac:
-        if self.json_tcp_ports is None and self.json_udp_ports is None:
-            return
-        
-        protocols = []
+    #### Compares the ports found by the last scan with the ones saved from the previous scan.
+    #### proto can be 'tcp' or 'udp' to check only that protocol. By default both are checked.
+    def CheckChanges(self,send_mail_flag,proto=None):
+        protocols = ['tcp','udp'] if proto is None else [proto]
 
-        if self.json_tcp_ports is not None and self.ports_tcp is not None:
-            old_tcp_port_nums = [p.num for p in self.json_tcp_ports]
-            new_tcp_port_nums = [p.num for p in self.ports_tcp]
-            protocols.append('tcp')
-
-        if self.json_udp_ports is not None and self.ports_udp is not None:
-            old_udp_port_nums = [p.num for p in self.json_udp_ports]
-            new_udp_port_nums = [p.num for p in self.ports_udp]
-            protocols.append('udp')
-        # print(old_port_nums)
-        # print(new_port_nums)
-        #### CHECK FOR NEW OPENED PORTS
-        #### CHECK FOR PORTS THAT ARE CLOSED 
-        
         for proto in protocols:
-
-            opened_ports = []
-            closed_ports = []
-            ports = []
-            new_port_nums = []
             if proto == 'tcp':
-                ports = self.json_tcp_ports
-                new_port_nums = new_tcp_port_nums
-                old_port_nums = old_tcp_port_nums
+                old_ports = self.json_tcp_ports
+                new_ports = self.ports_tcp
+            else:
+                old_ports = self.json_udp_ports
+                new_ports = self.ports_udp
 
-            elif proto == 'udp':
-                ports = self.json_udp_ports
-                new_port_nums = new_udp_port_nums
-                old_port_nums = old_udp_port_nums
+            #### nothing to compare with (first scan or no scan for this protocol)
+            if old_ports is None or new_ports is None:
+                continue
 
-            for new_port in self.ports:
-                    if new_port.num not in old_port_nums: # found new port
-                        opened_ports.append(new_port)
+            old_port_nums = [p.num for p in old_ports]
+            new_port_nums = [p.num for p in new_ports]
 
-            for old_port in ports:
-                if old_port.num not in new_port_nums: # found closed port (previously opened)
-                    closed_ports.append(old_port)
+            #### CHECK FOR NEW OPENED PORTS
+            opened_ports = [p for p in new_ports if p.num not in old_port_nums]
+            #### CHECK FOR PORTS THAT ARE CLOSED (previously opened)
+            closed_ports = [p for p in old_ports if p.num not in new_port_nums]
 
             for op in opened_ports:
-                message = "New "+proto +" port opened: " + op.num +' on host '+self.ip +'('+self.hostname+')\nService: '+op.service +'\nVersion: '+op.version
-                # print(message)
-                # SendMessage(message)
+                message = "New "+proto +" port opened: " + op.num +' on host '+self.ip +'('+self.hostname+')\nService: '+(op.service or '') +'\nVersion: '+(op.version or '')
                 if send_mail_flag:
                     SendMail('OPEN PORT ALERT',message)
 
             for cp in closed_ports:
-                message = proto+" Port closed: " + cp.num +' on host '+self.ip +'('+self.hostname+')\nService: '+cp.service +'\nVersion: '+cp.version
-                # print(message)
+                message = proto+" Port closed: " + cp.num +' on host '+self.ip +'('+self.hostname+')\nService: '+(cp.service or '') +'\nVersion: '+(cp.version or '')
                 if send_mail_flag:
                     SendMail('CLOSED PORT ALERT',message)
-                # SendMessage(message)
     
     def NotifyUp(self):
         message = 'Host '+self.ip +' ('+self.hostname+') with mac: '+self.mac+' is UP'

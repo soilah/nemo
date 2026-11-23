@@ -6,44 +6,28 @@ import xml.etree.ElementTree as ET
 
 ## This is an Nmap wrapper (hellooo)
 
+#### Splits the hosts found by the last scan in new hosts and hosts that were
+#### already known and finds which of the known hosts are not present any more.
 def RefreshHosts(new_hosts,old_hosts):
-    # for n in new_hosts:
-    #     Print2(n.ip)
-    # for o in old_hosts:
-    #     Print2(o.ip)
-    disconnected = []
-    same_hosts = []
-    new_list = new_hosts.copy()
-    while True:
-        found = False
-        for n_h in new_hosts:
-            for o_h in old_hosts:
-                if n_h.ip == o_h.ip:
-                    found = True
-                    # Print("SAME IP FOUND: ",n_h.ip)
-                    same_hosts.append(n_h)
-                    new_hosts.remove(n_h)
-                    break
-        if not found:
-            break
+    old_ips = [o_h.ip for o_h in old_hosts]
+    found_ips = [n_h.ip for n_h in new_hosts]
 
-    for o_h in old_hosts:
-        found = False
-        for n_h in new_list:
-            if n_h.ip == o_h.ip:
-                found = True
-                break
-        if not found:
-            disconnected.append(o_h)
-    # for n in new_hosts:
-    #     Print2("NEW " + n.ip)
+    same_hosts = [n_h for n_h in new_hosts if n_h.ip in old_ips]
+    only_new_hosts = [n_h for n_h in new_hosts if n_h.ip not in old_ips]
+    disconnected = [o_h for o_h in old_hosts if o_h.ip not in found_ips]
 
-    # for n in disconnected:
-    #     Print2("DIS" + n.ip)
-    
-    return new_hosts,same_hosts,disconnected
+    return only_new_hosts,same_hosts,disconnected
 
- 
+
+#### Returns the root of nmap's xml output or None if the output is not valid xml
+#### (i.e. nmap was killed before finishing or failed to run).
+def ParseXml(text):
+    if text is None or text.strip() == '':
+        return None
+    try:
+        return ET.fromstring(text)
+    except ET.ParseError:
+        return None
 
 
 class NmapParser:
@@ -51,12 +35,22 @@ class NmapParser:
         self.network_status = network_status
     
     def ParseHostUp(self,result):
-        if 'down' in result:
+        nmap_xml_root = ParseXml(result)
+        if nmap_xml_root is None:
             return False
-        return True
+        for host in nmap_xml_root.iter('host'):
+            for status in host.iter('status'):
+                if status.attrib.get('state') == 'up':
+                    return True
+        return False
     
     def ParsePingScan(self,result):
         self.result_text = result
+
+        #### scan was interrupted or failed. Keep the previous state.
+        nmap_xml_root = ParseXml(self.result_text)
+        if nmap_xml_root is None:
+            return
 
         self.network_status.disconnected = []
         self.network_status.new_hosts = []
@@ -64,7 +58,6 @@ class NmapParser:
         new_hosts = []
         host_id = 0
 
-        nmap_xml_root = ET.fromstring(self.result_text)
         for host in nmap_xml_root.iter('host'):
             mac = '____LOCALHOST____'
             mac_type = 'Unknown'
@@ -72,18 +65,19 @@ class NmapParser:
             hostname = ''
             for element in host:
                 for field in element.iter('address'):
-                    if field.attrib['addrtype'] == 'ipv4':
+                    if field.attrib['addrtype'] == 'ipv4' and ip == "x.x.x.x":
                         ip = field.attrib['addr']
                     elif field.attrib['addrtype'] == 'mac':
                         mac = field.attrib['addr']
                         if 'vendor' in field.attrib.keys():
                             mac_type = field.attrib['vendor']
-                    else:
-                        print("WX KATI PHGE SKATA STA ADDRESSES (oute ipv4 oute mac)")
                 for hname in element.iter('hostname'):
                     hostname = hname.attrib['name']
                     if hostname == ip:
                         hostname = ''
+            #### skip hosts without an ipv4 address
+            if ip == "x.x.x.x":
+                continue
             new_hosts.append(Host([ip,hostname],mac=mac,mac_type=mac_type))
 
         ### Categorize the Hosts found as new,current or disconnected
@@ -93,27 +87,43 @@ class NmapParser:
         self.network_status.hosts = curr_hosts
         self.network_status.new_hosts = new_hosts
     
+    #### Returns the open ports found and the protocol scanned.
+    #### The ports are None if the scan was stopped or failed.
     def ParseServiceScan(self,res,scan_type=1):
         self.result_text = res
+
+        protocol = 'tcp'
+        if scan_type == 0:
+            protocol = 'udp'
         
         if self.network_status.stopped.is_set():
-            # stopped = True
-            return
+            return None,protocol
 
+        nmap_xml_root = ParseXml(self.result_text)
+        if nmap_xml_root is None:
+            return None,protocol
+
+        #### udp ports that do not answer are reported as open|filtered
+        open_states = ['open']
+        if protocol == 'udp':
+            open_states.append('open|filtered')
 
         ports = []
-
-        nmap_xml_root = ET.fromstring(self.result_text)
         
         for port_info in nmap_xml_root.iter('port'):
-            port = ''
+            state = 'open'
+            for state_info in port_info.iter('state'):
+                state = state_info.attrib.get('state','open')
+            if state not in open_states:
+                continue
+
             service = ''
             version = ''
             port = port_info.attrib['portid']
             version_prefix = ' '
             attributes = ['product','extrainfo','ostype']
             for field in port_info.iter('service'):
-                service = field.attrib['name']
+                service = field.attrib.get('name','')
                 if 'version' in field.attrib.keys():
                     version = field.attrib['version']
                     version_prefix = ' - '
@@ -124,9 +134,7 @@ class NmapParser:
 
             ports.append(Port(port,None,service,version))
         
-        if scan_type == 0:
-            return ports,'udp'
-        return ports,'tcp'
+        return ports,protocol
     
     def ParseOsScan(self,res):
         self.result_text = res
@@ -134,7 +142,9 @@ class NmapParser:
             return
         os_info = []
         
-        nmap_xml_root = ET.fromstring(self.result_text)
+        nmap_xml_root = ParseXml(self.result_text)
+        if nmap_xml_root is None:
+            return None
         
         mac = ''
         mac_type = ''
@@ -261,12 +271,14 @@ class NmapParser:
 
 
 class NetworkScanner:
-    def __init__(self,network_status,bin='nmap'):
+    def __init__(self,network_status,bin='nmap',proman=None):
         self.nmap_bin = bin
-        self.proman = ProMan()
+        #### use the process manager of the main program (if given), so that
+        #### running scans can be killed when the user stops them
+        self.proman = proman if proman is not None else ProMan()
         self.network_status = network_status
         self.parser = NmapParser(self.network_status)
-        self.nmap_options = None
+        self.nmap_options = []
     
     def SetOptions(self,options):
         self.nmap_options = options
@@ -274,8 +286,10 @@ class NetworkScanner:
     def IsHostUp(self,ip):
         cmd = []
         cmd.append(self.nmap_bin)
-        cmd.append(ip)
         cmd.append('-sP')
+        cmd.append(ip)
+        cmd.append('-oX')
+        cmd.append('-')
 
         return self.parser.ParseHostUp(self.proman.RunProcessWait(cmd))
    

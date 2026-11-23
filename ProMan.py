@@ -6,6 +6,7 @@ import queue
 class ProMan:
     def __init__(self):
         self.process_list = []
+        self.process_lock = Lock()
         self.thread_list = queue.Queue()
         self.running_process = None
     
@@ -15,48 +16,58 @@ class ProMan:
         self.thread_list.put(thread) 
         return thread
     
+    #### Waits for all threads to finish. The threads are expected to have been
+    #### told to stop, so any process that they start in the meantime is killed.
     def JoinThreads(self):
         while not self.thread_list.empty():
             thread = self.thread_list.get()
-            thread.join()
+            while thread.is_alive():
+                self.KillProcesses()
+                thread.join(0.1)
 
     def RunProcess(self,command,shell=False):
-        proc = subprocess.Popen(command,stdout=subprocess.PIPE,shell=shell)
-        self.running_process = proc 
-        self.process_list.append(proc)
-        res = proc.communicate()[0].decode("utf-8") #command output
-        return res
+        return self.RunProcessWait(command,shell=shell)
 
+    #### Runs a command and returns its output when it finishes.
+    #### If the process gets killed (see KillProcesses), the output is whatever
+    #### was written until then (possibly truncated or empty).
     def RunProcessWait(self,command,shell=False):
-        # command.insert(0,'-S')
-        # command.insert(0,'sudo')
-        # proc = subprocess.Popen(command,stdin=proc1.stdout,stdout=subprocess.PIPE,shell=shell)
-        proc = subprocess.Popen(command,stdout=subprocess.PIPE,shell=shell)
-        self.process_list.append(proc)
-        proc.wait() 
-        res = proc.communicate()[0].decode("utf-8") #command output
-        self.process_list.remove(proc)
+        proc = subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,shell=shell)
+        self.running_process = proc
+        with self.process_lock:
+            self.process_list.append(proc)
+        try:
+            #### communicate() reads the output while waiting, so a big output
+            #### can not fill the pipe and block the child process
+            res = proc.communicate()[0].decode("utf-8",errors="replace") #command output
+        finally:
+            with self.process_lock:
+                if proc in self.process_list:
+                    self.process_list.remove(proc)
         return res
 
     ## Kills the last process created and removes it from the process list
     def KillProcess(self): 
-        process = self.process_list.pop()
-        if process.returncode is None:
-            kill_cmd = ['kill','-9',str(process.pid)]
-            subprocess.Popen(kill_cmd)
+        with self.process_lock:
+            if len(self.process_list) == 0:
+                return
+            process = self.process_list.pop()
+        if process.poll() is None:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
     
     def KillProcesses(self):
-        while self.HasProcesses() > 0:
+        while self.HasProcesses():
             self.KillProcess()
 
     
     def HasProcesses(self):
-        if len(self.process_list) > 0:
-            return True
-        return False
+        with self.process_lock:
+            return len(self.process_list) > 0
     
     def GetOutputWhileRunning(self):
         proc = self.process_list[-1]
-        for stdout_line in iter(proc.stdout.readline, ""):
+        for stdout_line in iter(proc.stdout.readline, b""):
             yield stdout_line
-        

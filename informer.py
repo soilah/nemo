@@ -128,6 +128,9 @@ def HostMonitorPorts(nemo,host_ip,hostname):
             colors.append([pricli.normal_color,pricli.RED])
         else:
             lines,colors = Nemo.PortScanResults(host_ip,nemo)
+
+        if network_status.stopped.is_set():
+            break
         
         info_window = InfoWindow(pricli,["Host Status"],lines,colors)
         control_panel.InsertWindow(info_window)
@@ -167,6 +170,9 @@ def HostMonitorStatus(nemo,host_ip,hostname):
     while not network_status.stopped.is_set():
         time.sleep(1)
         IsAlive = network_scanner.IsHostUp(host_ip)
+        #### the check was interrupted, so its result is not valid
+        if network_status.stopped.is_set():
+            return
         if IsAlive == prev_alive and not first:
             continue 
         colors =[[pricli.normal_color]]

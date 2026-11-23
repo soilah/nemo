@@ -72,8 +72,6 @@ def Analyzer(nemo):
                     else:
                         message.setMessage('Running service scan (version)...')
                     message.Show()
-                    os_lines, os_colors = Nemo.OsDetectionResults(host_ip,nemo)
-                    
 
                     lines,colors = Nemo.PortScanResults(host_ip,nemo)
                        

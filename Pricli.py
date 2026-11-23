@@ -9,7 +9,36 @@ from curses import wrapper
 from textwrap import wrap
 import time
 import random
-from threading import Lock
+from threading import Lock, RLock
+
+
+#### curses is not thread safe, but the screen is used by the main thread
+#### (reading keys) and by the scanning threads (printing results) at the same time.
+#### This wraps a curses window so that only one thread at a time can use it.
+class LockedWindow:
+    def __init__(self,window,lock):
+        self._window = window
+        self._lock = lock
+        #### do not block inside getch, so that the lock is not held while waiting for a key
+        self._window.timeout(50)
+
+    def getch(self,*args):
+        while True:
+            with self._lock:
+                key = self._window.getch(*args)
+            if key != -1:
+                return key
+            #### give the other threads a chance to print
+            time.sleep(0.01)
+
+    def __getattr__(self,name):
+        attribute = getattr(self._window,name)
+        if not callable(attribute):
+            return attribute
+        def locked_call(*args,**kwargs):
+            with self._lock:
+                return attribute(*args,**kwargs)
+        return locked_call
 
 
 #### This class represents a line that may or may not have colors
@@ -742,10 +771,8 @@ class OptionsChoiceMenu:
             elif self.key_pressed == ord('\n'):
                 changed_value = self.pricli.PrintInput()
                 if 'True' in changed_value or 'true' in changed_value or '1' == changed_value or changed_value == 1:
-                    print("TRUE")
                     changed_value = True
                 elif 'False' in changed_value or 'false' in changed_value or '0' == changed_value or changed_value == 0:
-                    print("FALSE")
                     changed_value = False
                 choices[options[self.pos]] = changed_value
 
@@ -934,7 +961,8 @@ class Pricli:
 
         #### curses general initializations
         ## Screen objects ##
-        self.screen1 = curses.initscr()
+        self.screen_lock = RLock()
+        self.screen1 = LockedWindow(curses.initscr(),self.screen_lock)
         self.screen2 = None
         self.screen = self.screen1
         self.unused_screen = None
@@ -1019,7 +1047,7 @@ class Pricli:
         self.menu = ChoiceMenu(self)
 
         ## Locks
-        self.lock = Lock()
+        self.lock = RLock()
 
         #### Input buffer
         self.input_buffer = ''
@@ -1065,7 +1093,8 @@ class Pricli:
         
     def ChangeWindow(self,reset=False):
         if self.screen2 == None:
-            self.screen2 = curses.newwin(self.screen_rows,self.screen_cols)
+            self.screen2 = LockedWindow(curses.newwin(self.screen_rows,self.screen_cols),self.screen_lock)
+            self.screen2.keypad(True)
             self.screen = self.screen2
             self.screen_in_use = 2
             self.options = self.screen2_options
